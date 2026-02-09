@@ -3,10 +3,10 @@
 // ============================================
 
 import React, { useState } from 'react';
-import { UserAgentConfig } from './personalization-types';
-import { CredentialManager, CREDENTIAL_TEMPLATES } from './credential-manager';
-import { AIDocumentationImporter } from './documentation-importer';
-import { MCPConnectorFactory } from './mcp-connector';
+import { UserAgentConfig } from '../lib/personalization-types';
+import { CredentialManager, CREDENTIAL_TEMPLATES } from '../lib/credential-manager';
+import { AIDocumentationImporter } from '../lib/documentation-importer';
+import { MCPConnectorFactory } from '../lib/mcp-connector';
 
 export function SetupWizard({ onComplete }: { onComplete: (config: UserAgentConfig) => void }) {
   const [step, setStep] = useState(1);

@@ -3,8 +3,8 @@
 // ============================================
 
 import React, { useState, useEffect } from 'react';
-import { PluginRegistry, registerBuiltInPlugins } from './plugin-registry';
-import { CopilotPlugin } from './personalization-types';
+import { PluginRegistry, registerBuiltInPlugins } from '../lib/plugin-registry';
+import { CopilotPlugin } from '../lib/personalization-types';
 
 export function PluginManager() {
   const [registry] = useState(() => {

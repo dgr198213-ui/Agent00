@@ -23,19 +23,39 @@ import { SetupWizard } from './components/SetupWizard';
 import { CredentialPanel } from './components/CredentialPanel';
 import { PluginManager } from './components/PluginManager';
 
-// Importar del Copiloto Maestro base (ajusta las rutas según tu estructura)
-// TODO: Implementar useAppState o conectar con el estado global existente
-// import { useAppState } from '@/store';
-// import { DecisionEngine } from '@/engines/decision-engine';
-// import { PatternDetector } from '@/engines/pattern-detector';
-// import { EvolutionEngine } from '@/engines/evolution-engine';
+// Importar del Copiloto Maestro base
+import { trpc } from '@/lib/trpc';
 
-// Hook temporal hasta que se implemente la integración completa
+/**
+ * Hook que conecta con el estado real del sistema Agent00 mediante tRPC
+ */
 function useAppState() {
+  const rulesQuery = trpc.copilot.rules.list.useQuery();
+  const utils = trpc.useUtils();
+  const recordMutation = trpc.copilot.interactions.record.useMutation();
+
   return {
-    rules: [],
-    decisionEngine: { evaluateRules: () => [] },
-    recordInteraction: () => ({}),
+    rules: rulesQuery.data || [],
+    decisionEngine: {
+      evaluateRules: (rules: any[], context: any) => {
+        // Lógica de evaluación local simplificada para feedback inmediato
+        return rules.filter(r => {
+          try {
+            // Evaluación básica de condiciones (ejemplo simple)
+            if (r.condition === 'true') return true;
+            return context.action?.type === r.condition.split('==')[1]?.trim().replace(/'/g, '');
+          } catch {
+            return false;
+          }
+        });
+      }
+    },
+    recordInteraction: async (type: string, description: string, outcome: any) => {
+      const result = await recordMutation.mutateAsync({ type, description, outcome });
+      utils.copilot.interactions.list.invalidate();
+      return result;
+    },
+    isLoading: rulesQuery.isLoading
   };
 }
 
@@ -308,6 +328,17 @@ export function usePersonalization() {
 // ============================================
 
 export function PersonalizedCopilot() {
+  // Inyectar estilos dinámicamente
+  useEffect(() => {
+    const styleId = 'personalized-copilot-styles';
+    if (!document.getElementById(styleId)) {
+      const styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.innerHTML = personalizedCopilotStyles;
+      document.head.appendChild(styleElement);
+    }
+  }, []);
+
   const {
     isConfigured,
     config,
@@ -320,7 +351,7 @@ export function PersonalizedCopilot() {
   } = usePersonalization();
   
   const [currentView, setCurrentView] = useState<
-    'dashboard' | 'credentials' | 'plugins' | 'terminal' | 'evolution'
+    'dashboard' | 'credentials' | 'plugins' | 'terminal' | 'evolution' | 'settings'
   >('dashboard');
   
   // Mostrar wizard si no está configurado
@@ -367,6 +398,12 @@ export function PersonalizedCopilot() {
           >
             🔌 Plugins
           </button>
+          <button
+            className={currentView === 'settings' ? 'active' : ''}
+            onClick={() => setCurrentView('settings')}
+          >
+            ⚙️ Ajustes
+          </button>
         </div>
       </nav>
       
@@ -397,6 +434,29 @@ export function PersonalizedCopilot() {
         {currentView === 'credentials' && <CredentialPanel />}
         
         {currentView === 'plugins' && <PluginManager />}
+        
+        {currentView === 'settings' && (
+          <div className="settings-view">
+            <h2>Configuración del Agente</h2>
+            <div className="settings-grid">
+              <div className="settings-card">
+                <h3>Perfil</h3>
+                <p>Modifica tu rol y nivel de experiencia para ajustar las sugerencias.</p>
+                <button onClick={() => {
+                  if(confirm('¿Quieres reiniciar el asistente de configuración?')) {
+                    localStorage.removeItem('user_agent_config');
+                    window.location.reload();
+                  }
+                }} className="btn-danger">Reiniciar Configuración</button>
+              </div>
+              <div className="settings-card">
+                <h3>Exportar Datos</h3>
+                <p>Descarga un backup de tus reglas y configuraciones.</p>
+                <button className="btn-secondary">Exportar JSON</button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -479,6 +539,9 @@ export const personalizedCopilotStyles = `
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .main-nav {
@@ -486,88 +549,162 @@ export const personalizedCopilotStyles = `
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .nav-brand h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .config-badge {
-  font-size: 0.75rem;
-  opacity: 0.8;
+  font-size: 0.7rem;
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+  border: 1px solid rgba(96, 165, 250, 0.2);
 }
 
 .nav-links {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 0.25rem;
+  border-radius: 8px;
 }
 
 .nav-links button {
-  padding: 0.75rem 1.5rem;
-  background: rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  background: transparent;
   border: none;
-  border-radius: 4px;
-  color: white;
+  border-radius: 6px;
+  color: #94a3b8;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .nav-links button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .nav-links button.active {
-  background: white;
-  color: #667eea;
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
   padding: 2rem;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent);
 }
 
 .dashboard {
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
+  display: grid;
+  gap: 2rem;
 }
 
-.profile-summary {
+.profile-summary, .test-decision, .settings-card {
   padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  margin-bottom: 2rem;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
-.test-decision {
-  padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+.profile-summary h3, .test-decision h3 {
+  margin-top: 0;
+  color: #60a5fa;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .test-decision textarea {
   width: 100%;
+  background: #0f172a;
+  color: #e2e8f0;
   padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: monospace;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: 'Fira Code', monospace;
   margin-bottom: 1rem;
+  resize: vertical;
 }
 
 .results {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #f5f5f5;
-  border-radius: 4px;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: #020617;
+  border-radius: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.2);
 }
 
 .results pre {
-  overflow-x: auto;
+  margin: 0;
   font-size: 0.85rem;
+  color: #93c5fd;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
 }
 `;

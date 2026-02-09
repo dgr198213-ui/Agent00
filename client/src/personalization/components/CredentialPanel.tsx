@@ -3,8 +3,8 @@
 // ============================================
 
 import React, { useState, useEffect } from 'react';
-import { CredentialManager, CREDENTIAL_TEMPLATES } from './credential-manager';
-import { CredentialStore, CredentialField } from './personalization-types';
+import { CredentialManager, CREDENTIAL_TEMPLATES } from '../lib/credential-manager';
+import { CredentialStore, CredentialField } from '../lib/personalization-types';
 
 export function CredentialPanel() {
   const [credentialManager] = useState(() => CredentialManager.getInstance());
