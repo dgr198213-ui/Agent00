@@ -1,6 +1,10 @@
 /**
- * Motor de Decisiones con Parser AST Real
- * Parsea y evalúa condiciones complejas sin usar eval()
+ * Motor de Decisiones con Parser AST Real + Indexación Optimizada
+ * v2.0 - Incluye:
+ * - Parser AST seguro (sin eval)
+ * - Indexación O(k) en lugar de O(n)
+ * - Métricas de performance por regla
+ * - Validación estricta con mensajes de error
  */
 
 import type { Rule, DecisionContext, DecisionResult } from "@shared/types";
@@ -41,12 +45,12 @@ class Tokenizer {
       // Logical operators
       if (this.match('AND') || this.match('and')) {
         tokens.push({ type: 'LOGICAL', value: 'and' });
-        this.pos += this.match('AND') ? 3 : 3;
+        this.pos += 3;
         continue;
       }
       if (this.match('OR') || this.match('or')) {
         tokens.push({ type: 'LOGICAL', value: 'or' });
-        this.pos += this.match('OR') ? 2 : 2;
+        this.pos += 2;
         continue;
       }
 
@@ -141,7 +145,7 @@ class Tokenizer {
   }
 
   private skipWhitespace() {
-    while (this.pos < this.input.length && /\\s/.test(this.input[this.pos])) {
+    while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
       this.pos++;
     }
   }
@@ -151,7 +155,7 @@ class Tokenizer {
   }
 
   private isDigit(char: string): boolean {
-    return /\\d/.test(char);
+    return /\d/.test(char);
   }
 
   private isAlpha(char: string): boolean {
@@ -347,14 +351,231 @@ class Evaluator {
 }
 
 // ============================================================================
+// SISTEMA DE INDEXACIÓN
+// ============================================================================
+
+interface RuleIndex {
+  byActionType: Map<string, Rule[]>;
+  byFileExtension: Map<string, Rule[]>;
+  byCategory: Map<string, Rule[]>;
+  global: Rule[];
+}
+
+interface RuleMetrics {
+  ruleId: string;
+  evaluations: number;
+  matches: number;
+  executionTimes: number[];
+  lastUsed: number;
+}
+
+interface IndexTerms {
+  actionTypes: string[];
+  fileExtensions: string[];
+  filePaths: string[];
+}
+
+// ============================================================================
 // DECISION ENGINE
 // ============================================================================
 
 export class DecisionEngine {
   private evaluator = new Evaluator();
+  
+  private ruleIndex: RuleIndex = {
+    byActionType: new Map(),
+    byFileExtension: new Map(),
+    byCategory: new Map(),
+    global: []
+  };
+  
+  private indexDirty = true;
+  private cachedRules: Rule[] = [];
+  private metrics = new Map<string, RuleMetrics>();
+
+  private extractIndexTerms(condition: string): IndexTerms {
+    const terms: IndexTerms = {
+      actionTypes: [],
+      fileExtensions: [],
+      filePaths: []
+    };
+    
+    const actionTypeRegex = /action\.type\s*==\s*['"](\w+)['"]/g;
+    let match;
+    while ((match = actionTypeRegex.exec(condition)) !== null) {
+      terms.actionTypes.push(match[1]);
+    }
+    
+    const extensionSingleRegex = /file\.extension\s*==\s*['"](\.\w+)['"]/g;
+    while ((match = extensionSingleRegex.exec(condition)) !== null) {
+      terms.fileExtensions.push(match[1]);
+    }
+    
+    const extensionArrayRegex = /file\.extension\s+in\s+\[(.*?)\]/g;
+    while ((match = extensionArrayRegex.exec(condition)) !== null) {
+      const extensions = match[1]
+        .split(',')
+        .map(s => s.trim().replace(/['"]/g, ''))
+        .filter(s => s.startsWith('.'));
+      terms.fileExtensions.push(...extensions);
+    }
+    
+    const pathRegex = /file\.path\.includes\(['"](\w+)['"]\)/g;
+    while ((match = pathRegex.exec(condition)) !== null) {
+      terms.filePaths.push(match[1]);
+    }
+    
+    return terms;
+  }
+
+  rebuildIndex(rules: Rule[]): void {
+    this.ruleIndex = {
+      byActionType: new Map(),
+      byFileExtension: new Map(),
+      byCategory: new Map(),
+      global: []
+    };
+    
+    for (const rule of rules) {
+      if (!rule.active) continue;
+      
+      const terms = this.extractIndexTerms(rule.condition);
+      let hasSpecificTerms = false;
+      
+      if (terms.actionTypes.length > 0) {
+        hasSpecificTerms = true;
+        terms.actionTypes.forEach(type => {
+          if (!this.ruleIndex.byActionType.has(type)) {
+            this.ruleIndex.byActionType.set(type, []);
+          }
+          this.ruleIndex.byActionType.get(type)!.push(rule);
+        });
+      }
+      
+      if (terms.fileExtensions.length > 0) {
+        hasSpecificTerms = true;
+        terms.fileExtensions.forEach(ext => {
+          if (!this.ruleIndex.byFileExtension.has(ext)) {
+            this.ruleIndex.byFileExtension.set(ext, []);
+          }
+          this.ruleIndex.byFileExtension.get(ext)!.push(rule);
+        });
+      }
+      
+      if (rule.category) {
+        if (!this.ruleIndex.byCategory.has(rule.category)) {
+          this.ruleIndex.byCategory.set(rule.category, []);
+        }
+        this.ruleIndex.byCategory.get(rule.category)!.push(rule);
+      }
+      
+      if (!hasSpecificTerms) {
+        this.ruleIndex.global.push(rule);
+      }
+    }
+    
+    this.cachedRules = rules;
+    this.indexDirty = false;
+  }
+
+  private getCandidateRules(context: DecisionContext): Rule[] {
+    if (this.indexDirty && this.cachedRules.length > 0) {
+      this.rebuildIndex(this.cachedRules);
+    }
+    
+    const candidates = new Set<Rule>();
+    
+    if (context.action?.type) {
+      const byAction = this.ruleIndex.byActionType.get(String(context.action.type));
+      if (byAction) {
+        byAction.forEach(r => candidates.add(r));
+      }
+    }
+    
+    if (context.file?.extension) {
+      const byExt = this.ruleIndex.byFileExtension.get(String(context.file.extension));
+      if (byExt) {
+        byExt.forEach(r => candidates.add(r));
+      }
+    }
+    
+    this.ruleIndex.global.forEach(r => candidates.add(r));
+    
+    return Array.from(candidates);
+  }
+
+  invalidateIndex(): void {
+    this.indexDirty = true;
+  }
+
+  private recordMetrics(ruleId: string, executionTime: number, matched: boolean): void {
+    let m = this.metrics.get(ruleId);
+    if (!m) {
+      m = {
+        ruleId,
+        evaluations: 0,
+        matches: 0,
+        executionTimes: [],
+        lastUsed: Date.now()
+      };
+      this.metrics.set(ruleId, m);
+    }
+    
+    m.evaluations++;
+    if (matched) m.matches++;
+    m.lastUsed = Date.now();
+    
+    m.executionTimes.push(executionTime);
+    if (m.executionTimes.length > 100) {
+      m.executionTimes.shift();
+    }
+  }
+
+  getRuleMetrics(ruleId: string): RuleMetrics | null {
+    return this.metrics.get(ruleId) || null;
+  }
+
+  getSystemMetrics() {
+    const allMetrics = Array.from(this.metrics.values());
+    
+    if (allMetrics.length === 0) {
+      return {
+        totalRules: 0,
+        totalEvaluations: 0,
+        totalMatches: 0,
+        avgMatchRate: 0,
+        avgExecutionTime: 0,
+        p50ExecutionTime: 0,
+        p95ExecutionTime: 0,
+        p99ExecutionTime: 0
+      };
+    }
+    
+    const totalEvaluations = allMetrics.reduce((sum, m) => sum + m.evaluations, 0);
+    const totalMatches = allMetrics.reduce((sum, m) => sum + m.matches, 0);
+    
+    const allTimes = allMetrics.flatMap(m => m.executionTimes);
+    const sortedTimes = allTimes.sort((a, b) => a - b);
+    
+    const percentile = (p: number) => {
+      const index = Math.floor(sortedTimes.length * p);
+      return sortedTimes[index] || 0;
+    };
+    
+    return {
+      totalRules: allMetrics.length,
+      totalEvaluations,
+      totalMatches,
+      avgMatchRate: totalMatches / totalEvaluations,
+      avgExecutionTime: allTimes.reduce((sum, t) => sum + t, 0) / allTimes.length,
+      p50ExecutionTime: percentile(0.50),
+      p95ExecutionTime: percentile(0.95),
+      p99ExecutionTime: percentile(0.99)
+    };
+  }
 
   evaluateRule(rule: Rule, context: DecisionContext): DecisionResult {
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     try {
       const tokenizer = new Tokenizer(rule.condition);
@@ -363,7 +584,9 @@ export class DecisionEngine {
       const ast = parser.parse();
       const matched = this.evaluator.evaluate(ast, context);
 
-      const executionTime = Date.now() - startTime;
+      const executionTime = performance.now() - startTime;
+      
+      this.recordMetrics(rule.id, executionTime, matched);
 
       return {
         ruleId: rule.id,
@@ -376,7 +599,7 @@ export class DecisionEngine {
         executionTime,
       };
     } catch (error) {
-      const executionTime = Date.now() - startTime;
+      const executionTime = performance.now() - startTime;
       return {
         ruleId: rule.id,
         ruleName: rule.name,
@@ -391,22 +614,28 @@ export class DecisionEngine {
   }
 
   evaluateRules(rules: Rule[], context: DecisionContext) {
-    const startTime = Date.now();
-    const results = rules
+    const startTime = performance.now();
+    
+    // Obtener solo reglas candidatas (indexación O(k))
+    const candidates = this.getCandidateRules(context);
+    
+    const results = candidates
       .filter(r => r.active)
       .map(rule => this.evaluateRule(rule, context))
       .filter(r => r.matched)
       .sort((a, b) => b.confidence - a.confidence);
 
-    const executionTime = Date.now() - startTime;
+    const executionTime = performance.now() - startTime;
 
     return {
       results,
       stats: {
         totalRules: rules.length,
+        activeRules: rules.filter(r => r.active).length,
+        candidateRules: candidates.length,
         matchedRules: results.length,
-        averageConfidence: results.length > 0 ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length : 0,
         evaluationTime: executionTime,
+        indexEfficiency: ((1 - candidates.length / rules.length) * 100).toFixed(1) + '%',
         topMatches: results.slice(0, 5),
       },
     };
@@ -425,5 +654,18 @@ export class DecisionEngine {
         error: error instanceof Error ? error.message : 'Error desconocido',
       };
     }
+  }
+
+  clearOldMetrics(maxAge: number): void {
+    const now = Date.now();
+    const toDelete: string[] = [];
+    
+    this.metrics.forEach((m, id) => {
+      if (now - m.lastUsed > maxAge) {
+        toDelete.push(id);
+      }
+    });
+    
+    toDelete.forEach(id => this.metrics.delete(id));
   }
 }

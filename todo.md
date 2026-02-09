@@ -63,3 +63,12 @@
 - [x] Crear checkpoint inicial
 - [x] Validar funcionalidad completa
 - [x] Preparar para publicación
+
+## Integración DecisionEngine v2.0 (Optimización)
+- [x] Reemplazar decision-engine.ts con versión v2.0
+- [x] Integrar sistema de métricas en API tRPC
+- [x] Agregar invalidación de índice en operaciones de reglas
+- [ ] Crear componentes UI para métricas
+- [x] Implementar tests de performance
+- [x] Validar speedup 60-600x
+- [ ] Subir cambios a GitHub

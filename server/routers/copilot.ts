@@ -93,6 +93,9 @@ export const copilotRouter = router({
         successRate: null,
       });
 
+      // Invalidar índice para que se reconstruya en la próxima evaluación
+      decisionEngine.invalidateIndex();
+
       return newRule;
     }),
 
@@ -120,11 +123,16 @@ export const copilotRouter = router({
           updatedAt: new Date(),
         } as any);
 
+        // Invalidar índice después de actualizar
+        decisionEngine.invalidateIndex();
+
         return updated;
       }),
 
     delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
       await db.deleteRule(input.id);
+      // Invalidar índice después de eliminar
+      decisionEngine.invalidateIndex();
       return { success: true };
     }),
 
@@ -138,6 +146,9 @@ export const copilotRouter = router({
         active: !rule.active,
         updatedAt: new Date(),
       } as any);
+
+      // Invalidar índice después de cambiar estado
+      decisionEngine.invalidateIndex();
 
       return updated;
     }),
@@ -206,6 +217,25 @@ export const copilotRouter = router({
 
       return result;
     }),
+  }),
+
+  metrics: router({
+    system: protectedProcedure.query(async () => {
+      return decisionEngine.getSystemMetrics();
+    }),
+
+    rule: protectedProcedure
+      .input(z.object({ ruleId: z.string() }))
+      .query(async ({ input }) => {
+        const metrics = decisionEngine.getRuleMetrics(input.ruleId);
+        if (!metrics) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Metricas no encontradas para esta regla",
+          });
+        }
+        return metrics;
+      }),
   }),
 
   // ========================================================================
