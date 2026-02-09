@@ -72,11 +72,51 @@ export class TaskSchedulerMCPConnector extends BaseMCPConnector {
   }
   
   /**
+   * Carga tareas persistidas desde el archivo local
+   */
+  async loadPersistedTasks(): Promise<void> {
+    try {
+      const fs = await import('fs');
+      if (fs.existsSync(this.persistenceFilePath)) {
+        const content = fs.readFileSync(this.persistenceFilePath, 'utf-8');
+        const persistedTasks = JSON.parse(content);
+        
+        for (const task of persistedTasks) {
+          this.tasks.set(task.id, task);
+          if (task.enabled) {
+            await this.enableTask(task.id);
+          }
+        }
+        
+        console.log(`✅ ${persistedTasks.length} tareas cargadas desde persistencia`);
+      }
+    } catch (error) {
+      console.warn('Advertencia: No se pudieron cargar tareas persistidas:', error);
+    }
+  }
+  
+  /**
+   * Guarda las tareas actuales en el archivo local
+   */
+  async persistTasks(): Promise<void> {
+    try {
+      const fs = await import('fs');
+      const tasksArray = Array.from(this.tasks.values());
+      fs.writeFileSync(this.persistenceFilePath, JSON.stringify(tasksArray, null, 2), 'utf-8');
+    } catch (error) {
+      console.error('Error persistiendo tareas:', error);
+    }
+  }
+  
+  /**
    * Valida una expresión cron
    */
   private isValidCronExpression(cron: string): boolean {
     try {
-      schedule.scheduleJob(cron, () => {});
+      const job = schedule.scheduleJob(cron, () => {});
+      if (job) {
+        job.cancel();
+      }
       return true;
     } catch {
       return false;
@@ -133,6 +173,9 @@ export class TaskSchedulerMCPConnector extends BaseMCPConnector {
       if (newTask.enabled) {
         await this.enableTask(task.id);
       }
+      
+      // Persistir tareas
+      await this.persistTasks();
       
       return {
         success: true,
@@ -314,6 +357,9 @@ export class TaskSchedulerMCPConnector extends BaseMCPConnector {
       // Eliminar tarea
       this.tasks.delete(taskId);
       this.taskCallbacks.delete(taskId);
+      
+      // Persistir cambios
+      await this.persistTasks();
       
       return {
         success: true,

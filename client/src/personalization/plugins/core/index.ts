@@ -409,7 +409,7 @@ export function registerCorePlugins(registry: PluginRegistry): void {
   } catch (error) {
     console.error('❌ Error registrando Task Scheduler:', error);
   }
-
+}
 
 // Exportar conectores para uso directo si es necesario
 export { FileSystemMCPConnector, ShellMCPConnector, WebSearchMCPConnector, TaskSchedulerMCPConnector };

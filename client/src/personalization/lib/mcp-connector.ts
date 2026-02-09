@@ -482,3 +482,6 @@ export class MCPConnectorFactory {
     return this.getAll().filter(c => c.connected);
   }
 }
+
+// Exportar tipos para uso en plugins
+export type { MCPResponse, MCPConnectorConfig };
