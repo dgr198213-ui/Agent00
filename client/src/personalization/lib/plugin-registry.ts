@@ -285,6 +285,13 @@ import { AIDocumentationImporter, MarkdownImporter } from './documentation-impor
  * Registra plugins por defecto
  */
 export function registerBuiltInPlugins(registry: PluginRegistry): void {
+  // Importar y registrar plugins core
+  try {
+    const { registerCorePlugins } = require('../plugins/core');
+    registerCorePlugins(registry);
+  } catch (error) {
+    console.warn('No se pudieron cargar los plugins core:', error);
+  }
   
   // Plugin: Conector NotebookLM
   registry.register({
