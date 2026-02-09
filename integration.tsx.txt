@@ -1,0 +1,563 @@
+// ============================================
+// INTEGRACIÓN COMPLETA DEL SISTEMA
+// ============================================
+
+/**
+ * Este archivo demuestra cómo integrar todo el sistema de personalización
+ * con el Copiloto Maestro existente.
+ */
+
+import React, { useState, useEffect } from 'react';
+
+// Importar tipos
+import { UserAgentConfig, CopilotPlugin, MCPConnector } from './personalization-types';
+
+// Importar gestores
+import { CredentialManager } from './credential-manager';
+import { PluginRegistry, registerBuiltInPlugins } from './plugin-registry';
+import { MCPConnectorFactory } from './mcp-connector';
+import { AIDocumentationImporter } from './documentation-importer';
+
+// Importar componentes UI
+import { SetupWizard } from './components/SetupWizard';
+import { CredentialPanel } from './components/CredentialPanel';
+import { PluginManager } from './components/PluginManager';
+
+// Importar del Copiloto Maestro base (ajusta las rutas según tu estructura)
+import { useAppState } from './store';
+import { DecisionEngine } from './decision-engine';
+import { PatternDetector } from './pattern-detector';
+import { EvolutionEngine } from './evolution-engine';
+
+// ============================================
+// HOOK PERSONALIZADO: usePersonalization
+// ============================================
+
+/**
+ * Hook que integra el sistema de personalización con el copiloto base
+ */
+export function usePersonalization() {
+  const baseState = useAppState(); // Estado del copiloto base
+  const [config, setConfig] = useState<UserAgentConfig | null>(null);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [registry] = useState(() => {
+    const reg = PluginRegistry.getInstance();
+    registerBuiltInPlugins(reg);
+    return reg;
+  });
+  
+  // Cargar configuración guardada
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('user_agent_config');
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        setConfig(parsed);
+        setIsConfigured(true);
+      } catch (error) {
+        console.error('Error cargando configuración:', error);
+      }
+    }
+  }, []);
+  
+  // Guardar configuración cuando cambia
+  const saveConfig = (newConfig: UserAgentConfig) => {
+    setConfig(newConfig);
+    setIsConfigured(true);
+    localStorage.setItem('user_agent_config', JSON.stringify(newConfig));
+  };
+  
+  // ============================================
+  // ENRIQUECER DECISIONES CON MCP
+  // ============================================
+  
+  /**
+   * Enriquece el contexto de decisión con conocimiento de conectores MCP
+   */
+  const enrichDecisionContext = async (context: any) => {
+    const enrichedContext = { ...context };
+    
+    // Obtener conectores habilitados
+    const connectors = MCPConnectorFactory.getConnected();
+    
+    // Consultar cada conector
+    for (const connector of connectors) {
+      try {
+        const prompt = `
+          Contexto de decisión:
+          Acción: ${JSON.stringify(context.action)}
+          
+          ¿Qué información relevante tienes sobre esta acción?
+        `;
+        
+        const response = await connector.query(prompt, context);
+        
+        if (response.success) {
+          enrichedContext[`mcp_${connector.id}`] = response.data;
+        }
+      } catch (error) {
+        console.error(`Error consultando ${connector.name}:`, error);
+      }
+    }
+    
+    return enrichedContext;
+  };
+  
+  // ============================================
+  // EVALUAR DECISIÓN MEJORADA
+  // ============================================
+  
+  /**
+   * Evalúa decisión usando reglas base + personalizadas + conocimiento MCP
+   */
+  const evaluateDecisionEnhanced = async (context: any) => {
+    // 1. Enriquecer contexto con MCP
+    const enrichedContext = await enrichDecisionContext(context);
+    
+    // 2. Obtener reglas base
+    const baseRules = baseState.rules;
+    
+    // 3. Agregar reglas personalizadas del usuario
+    const customRules = config?.customRules || [];
+    
+    // 4. Agregar reglas contribuidas por plugins
+    const pluginRules = registry.getContributedRules();
+    
+    // 5. Combinar todas las reglas
+    const allRules = [...baseRules, ...customRules, ...pluginRules];
+    
+    // 6. Evaluar con el motor de decisiones
+    const results = baseState.decisionEngine.evaluateRules(allRules, enrichedContext);
+    
+    // 7. Ejecutar hooks de plugins
+    await registry.executeHook('onDecision', enrichedContext);
+    
+    return {
+      results,
+      enrichedContext,
+      rulesUsed: {
+        base: baseRules.length,
+        custom: customRules.length,
+        plugins: pluginRules.length,
+      },
+    };
+  };
+  
+  // ============================================
+  // REGISTRAR INTERACCIÓN MEJORADA
+  // ============================================
+  
+  /**
+   * Registra interacción y sincroniza con conectores MCP
+   */
+  const recordInteractionEnhanced = async (
+    type: string,
+    description: string,
+    outcome?: string
+  ) => {
+    // 1. Registrar en el copiloto base
+    const interaction = baseState.recordInteraction(type, description, outcome);
+    
+    // 2. Ejecutar hooks de plugins
+    await registry.executeHook('onInteraction', interaction);
+    
+    // 3. Sincronizar con conectores MCP (si configurado)
+    const connectors = MCPConnectorFactory.getConnected();
+    for (const connector of connectors) {
+      if (connector.config.options?.autoSync) {
+        try {
+          await connector.addContext({
+            type: 'interaction',
+            data: interaction,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error(`Error sincronizando con ${connector.name}:`, error);
+        }
+      }
+    }
+    
+    return interaction;
+  };
+  
+  // ============================================
+  // IMPORTAR DOCUMENTACIÓN
+  // ============================================
+  
+  /**
+   * Importa documentación y actualiza configuración
+   */
+  const importDocumentation = async (file: File, anthropicApiKey?: string) => {
+    const importer = new AIDocumentationImporter(anthropicApiKey);
+    
+    try {
+      const result = await importer.import(file);
+      
+      if (result.success && config) {
+        // Agregar reglas extraídas a la configuración
+        const updatedConfig = {
+          ...config,
+          customRules: [...config.customRules, ...result.rulesExtracted],
+          knowledge: {
+            ...config.knowledge,
+            documents: [
+              ...config.knowledge.documents,
+              {
+                source: file.name,
+                imported: new Date().toISOString(),
+                rulesExtracted: result.rulesExtracted.length,
+                hash: '', // TODO: Calcular hash del archivo
+              },
+            ],
+          },
+        };
+        
+        saveConfig(updatedConfig);
+        
+        return {
+          success: true,
+          rulesAdded: result.rulesExtracted.length,
+          result,
+        };
+      }
+      
+      return { success: false, error: 'No se pudieron extraer reglas' };
+    } catch (error) {
+      console.error('Error importando documentación:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // ============================================
+  // CONECTAR MCP
+  // ============================================
+  
+  /**
+   * Conecta un servicio MCP
+   */
+  const connectMCP = async (
+    type: MCPConnector['type'],
+    credentials: Record<string, string>,
+    connectorConfig?: any
+  ) => {
+    try {
+      const connector = MCPConnectorFactory.create(type, connectorConfig);
+      await connector.connect(credentials);
+      
+      // Actualizar configuración
+      if (config) {
+        const updatedConfig = {
+          ...config,
+          mcpConnectors: {
+            ...config.mcpConnectors,
+            [connector.id]: {
+              enabled: true,
+              credentialId: connector.id,
+              config: connector.config,
+            },
+          },
+        };
+        
+        saveConfig(updatedConfig);
+      }
+      
+      return { success: true, connector };
+    } catch (error) {
+      console.error('Error conectando MCP:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // ============================================
+  // RETORNAR API
+  // ============================================
+  
+  return {
+    // Estado
+    config,
+    isConfigured,
+    registry,
+    
+    // Acciones base (del copiloto original)
+    ...baseState,
+    
+    // Acciones mejoradas
+    evaluateDecision: evaluateDecisionEnhanced,
+    recordInteraction: recordInteractionEnhanced,
+    
+    // Nuevas acciones
+    saveConfig,
+    importDocumentation,
+    connectMCP,
+    enrichDecisionContext,
+  };
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL INTEGRADO
+// ============================================
+
+export function PersonalizedCopilot() {
+  const {
+    isConfigured,
+    config,
+    saveConfig,
+    evaluateDecision,
+    recordInteraction,
+    importDocumentation,
+    connectMCP,
+    // ... resto del estado
+  } = usePersonalization();
+  
+  const [currentView, setCurrentView] = useState<
+    'dashboard' | 'credentials' | 'plugins' | 'terminal' | 'evolution'
+  >('dashboard');
+  
+  // Mostrar wizard si no está configurado
+  if (!isConfigured) {
+    return <SetupWizard onComplete={saveConfig} />;
+  }
+  
+  return (
+    <div className="personalized-copilot">
+      <nav className="main-nav">
+        <div className="nav-brand">
+          <h1>🤖 {config?.profile.role || 'Mi Agente'}</h1>
+          <span className="config-badge">{config?.version}</span>
+        </div>
+        
+        <div className="nav-links">
+          <button
+            className={currentView === 'dashboard' ? 'active' : ''}
+            onClick={() => setCurrentView('dashboard')}
+          >
+            🏠 Dashboard
+          </button>
+          <button
+            className={currentView === 'terminal' ? 'active' : ''}
+            onClick={() => setCurrentView('terminal')}
+          >
+            💻 Terminal
+          </button>
+          <button
+            className={currentView === 'evolution' ? 'active' : ''}
+            onClick={() => setCurrentView('evolution')}
+          >
+            🧬 Evolución
+          </button>
+          <button
+            className={currentView === 'credentials' ? 'active' : ''}
+            onClick={() => setCurrentView('credentials')}
+          >
+            🔐 Credenciales
+          </button>
+          <button
+            className={currentView === 'plugins' ? 'active' : ''}
+            onClick={() => setCurrentView('plugins')}
+          >
+            🔌 Plugins
+          </button>
+        </div>
+      </nav>
+      
+      <main className="main-content">
+        {currentView === 'dashboard' && (
+          <Dashboard
+            config={config}
+            onEvaluate={evaluateDecision}
+            onRecord={recordInteraction}
+          />
+        )}
+        
+        {currentView === 'terminal' && (
+          <Terminal
+            onCommand={(cmd, args) => {
+              // Manejar comandos de terminal
+              // Integrar con el terminal existente
+            }}
+          />
+        )}
+        
+        {currentView === 'evolution' && (
+          <Evolution
+            // Componente de evolución del copiloto base
+          />
+        )}
+        
+        {currentView === 'credentials' && <CredentialPanel />}
+        
+        {currentView === 'plugins' && <PluginManager />}
+      </main>
+    </div>
+  );
+}
+
+// ============================================
+// COMPONENTE: DASHBOARD PERSONALIZADO
+// ============================================
+
+function Dashboard({
+  config,
+  onEvaluate,
+  onRecord,
+}: {
+  config: UserAgentConfig | null;
+  onEvaluate: (context: any) => Promise<any>;
+  onRecord: (type: string, desc: string, outcome?: string) => Promise<any>;
+}) {
+  const [testContext, setTestContext] = useState('');
+  const [results, setResults] = useState<any>(null);
+  
+  const handleTest = async () => {
+    try {
+      const context = JSON.parse(testContext);
+      const result = await onEvaluate(context);
+      setResults(result);
+    } catch (error) {
+      alert('Error evaluando: ' + error.message);
+    }
+  };
+  
+  return (
+    <div className="dashboard">
+      <h2>Dashboard Personalizado</h2>
+      
+      <div className="profile-summary">
+        <h3>Tu Perfil</h3>
+        <p><strong>Rol:</strong> {config?.profile.role}</p>
+        <p><strong>Experiencia:</strong> {config?.profile.experience}</p>
+        <p><strong>Reglas activas:</strong> {config?.customRules.length}</p>
+        <p><strong>Documentos importados:</strong> {config?.knowledge.documents.length}</p>
+      </div>
+      
+      <div className="test-decision">
+        <h3>Probar Decisión</h3>
+        <textarea
+          value={testContext}
+          onChange={(e) => setTestContext(e.target.value)}
+          placeholder='{"action":{"type":"deploy"},"target":"production"}'
+          rows={5}
+        />
+        <button onClick={handleTest}>Evaluar</button>
+        
+        {results && (
+          <div className="results">
+            <h4>Resultados:</h4>
+            <pre>{JSON.stringify(results, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Placeholder para otros componentes
+function Terminal({ onCommand }: any) {
+  return <div>Terminal Component (usar el existente)</div>;
+}
+
+function Evolution() {
+  return <div>Evolution Component (usar el existente)</div>;
+}
+
+// ============================================
+// ESTILOS
+// ============================================
+
+export const personalizedCopilotStyles = `
+.personalized-copilot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.main-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.nav-brand h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.config-badge {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-links button {
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-links button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.nav-links button.active {
+  background: white;
+  color: #667eea;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.profile-summary {
+  padding: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.test-decision {
+  padding: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.test-decision textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  margin-bottom: 1rem;
+}
+
+.results {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.results pre {
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+`;

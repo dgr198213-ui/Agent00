@@ -1,365 +1,524 @@
-# 🚀 Copiloto Maestro - Guía de Inicio Rápido
+# 🚀 Sistema de Personalización para Copiloto Maestro
 
-## ¿Qué es esto?
+## Descripción
 
-Un **sistema de copiloto completamente funcional** con:
-- ✅ Motor de decisiones REAL (no simulado)
-- ✅ Detección de patrones automática
-- ✅ Evolución adaptativa basada en uso
-- ✅ Persistencia real en localStorage
-- ✅ Terminal interactiva
+Sistema completo de personalización que permite a cada usuario crear su propia versión del agente, adaptada a sus necesidades específicas mediante:
 
-**Todo funciona de verdad. Sin simulacros.**
-
----
-
-## 🎯 Inicio Rápido (30 segundos)
-
-1. **Abre** `copilot-master.html` en tu navegador
-2. **Explora** la interfaz - ya tiene datos de ejemplo
-3. **Ve a "Terminal"** (segundo botón del menú)
-4. **Escribe:** `help` y presiona Enter
-
-¡Ya estás dentro!
+- **✅ Panel de Credenciales Seguro** (AES-256-GCM)
+- **✅ Conectores MCP** (NotebookLM, GitHub, APIs personalizadas)
+- **✅ Importador de Documentación con IA** (extracción automática de reglas)
+- **✅ Sistema de Plugins** (extensible y modular)
+- **✅ Wizard de Configuración** (onboarding guiado)
 
 ---
 
-## 💡 Primeros Comandos
+## 📦 Archivos Incluidos
+
+```
+personalization-system/
+├── personalization-types.ts      # Tipos TypeScript completos
+├── credential-manager.ts          # Gestor de credenciales encriptado
+├── mcp-connector.ts               # Conectores MCP universales
+├── documentation-importer.ts      # Importador con IA (Claude API)
+├── plugin-registry.ts             # Sistema de plugins
+├── CredentialPanel.tsx            # UI: Panel de credenciales
+├── PluginManager.tsx              # UI: Gestor de plugins
+├── SetupWizard.tsx                # UI: Wizard de configuración
+└── README.md                      # Este archivo
+```
+
+---
+
+## 🔧 Instalación
+
+### Requisitos Previos
+
+- Node.js 18+
+- React 18+
+- TypeScript 5+
+- Copiloto Maestro base instalado
+
+### Paso 1: Copiar Archivos
 
 ```bash
-# Ver estado del sistema
-$ status
-
-# Ver qué patrones detectó
-$ patterns
-
-# Probar una regla de seguridad
-$ test safety_001
-
-# Registrar una interacción
-$ interact file_edit "Modified config.json"
-
-# Evaluar una decisión
-$ decide {"action":{"type":"delete"}}
-
-# Ejecutar evolución automática
-$ evolve
-
-# Ver estadísticas
-$ stats
+# Copiar todos los archivos al proyecto
+cp personalization-types.ts /tu-proyecto/src/
+cp credential-manager.ts /tu-proyecto/src/
+cp mcp-connector.ts /tu-proyecto/src/
+cp documentation-importer.ts /tu-proyecto/src/
+cp plugin-registry.ts /tu-proyecto/src/
+cp CredentialPanel.tsx /tu-proyecto/src/components/
+cp PluginManager.tsx /tu-proyecto/src/components/
+cp SetupWizard.tsx /tu-proyecto/src/components/
 ```
 
----
-
-## 🎮 Prueba el Motor de Decisiones
-
-1. **Ve a "Motor de Decisión"** (menú lateral)
-2. **Haz clic en** "Eliminar archivo"
-3. **Observa** cómo las reglas de seguridad se activan automáticamente
-4. **Prueba el editor JSON** personalizado
-
-**¿Qué está pasando?**
-- El motor parsea la condición de cada regla
-- Evalúa contra el contexto que le diste
-- Retorna las reglas que coinciden con su razonamiento
-
----
-
-## 🔍 Explora los Patrones
-
-1. **Ve a "Terminal"**
-2. **Escribe:** `interact code_edit "Fixed bug in auth"`
-3. **Repite** 5-10 interacciones similares
-4. **Escribe:** `patterns`
-
-**¿Qué está pasando?**
-- El detector analiza las últimas 100 interacciones
-- Busca secuencias, temporalidad, frecuencia
-- Sugiere reglas automáticas cuando encuentra patrones fuertes
-
----
-
-## 🧬 Observa la Evolución
-
-1. **Ve a "Evolución"** (menú lateral)
-2. **Observa** el historial de eventos
-3. **En Terminal, escribe:** `evolve`
-4. **Vuelve a "Evolución"** - verás nuevos eventos
-
-**¿Qué está pasando?**
-- El motor analiza performance de cada regla
-- Propone crear, modificar o deprecar reglas
-- Genera nuevas reglas desde patrones detectados
-- Todo basado en datos reales de uso
-
----
-
-## 📊 Monitorea el Sistema
-
-1. **Ve a "Monitoreo"**
-2. **Observa** las métricas en tiempo real
-3. **Nota** cómo cambian al usar el sistema
-
-**Métricas clave:**
-- Madurez del sistema (aumenta con uso)
-- Reglas activas vs deprecadas
-- Tasa de éxito de interacciones
-- Patrones detectados
-
----
-
-## 🎯 Casos de Uso Prácticos
-
-### 1. Testing de Reglas de Seguridad
+### Paso 2: Instalar Dependencias
 
 ```bash
-$ rules show safety_001
-$ test safety_001
+npm install @anthropic-ai/sdk  # Para importador con IA (opcional)
 ```
 
-### 2. Simulación de Workflow
+### Paso 3: Integrar en App Principal
 
-```bash
-$ interact file_open "Opened config.json"
-$ interact file_edit "Modified settings"
-$ interact file_save "Saved changes"
-$ interact file_close "Closed file"
-# Repetir 3-4 veces, luego:
-$ patterns
-# Verás una secuencia detectada!
-```
+```tsx
+// App.tsx
+import React, { useState, useEffect } from 'react';
+import { SetupWizard } from './components/SetupWizard';
+import { CredentialPanel } from './components/CredentialPanel';
+import { PluginManager } from './components/PluginManager';
+import { UserAgentConfig } from './personalization-types';
 
-### 3. Evaluación Compleja
+// Importar estilos
+import { credentialPanelStyles } from './components/CredentialPanel';
+import { pluginManagerStyles } from './components/PluginManager';
+import { setupWizardStyles } from './components/SetupWizard';
 
-```bash
-$ decide {"action":{"type":"deploy","target":"production"},"user":{"activity":"urgent"}}
-```
-
----
-
-## 💾 Persistencia
-
-**Todo se guarda automáticamente en localStorage.**
-
-Para verificar:
-1. Registra algunas interacciones
-2. Cierra el navegador
-3. Abre de nuevo el HTML
-4. Los datos siguen ahí
-
-**Backup manual:**
-```bash
-$ backup
-# Guarda: backup_1707408234567
-```
-
-**Reset completo:**
-```bash
-$ reset
-# Confirma y todo se limpia
-```
-
----
-
-## 🏗️ Arquitectura en 5 Capas
-
-```
-┌─────────────────────────────────────┐
-│  UI Components (React + Tailwind)  │
-├─────────────────────────────────────┤
-│  Store (useAppState hook)          │
-├─────────────────────────────────────┤
-│  ┌──────────┬──────────┬──────────┐ │
-│  │ Decision │ Pattern  │Evolution │ │
-│  │ Engine   │ Detector │ Engine   │ │
-│  └──────────┴──────────┴──────────┘ │
-├─────────────────────────────────────┤
-│  Storage Engine (localStorage)      │
-└─────────────────────────────────────┘
-```
-
----
-
-## 🔧 Personalización
-
-### Crear Regla Manual
-
-En "Motor de Decisión", usa el editor JSON:
-```json
-{
-  "action": {
-    "type": "email_send"
-  },
-  "file": {
-    "size": 10485760
+function App() {
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [config, setConfig] = useState<UserAgentConfig | null>(null);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'credentials' | 'plugins'>('dashboard');
+  
+  useEffect(() => {
+    // Cargar configuración guardada
+    const savedConfig = localStorage.getItem('user_agent_config');
+    if (savedConfig) {
+      setConfig(JSON.parse(savedConfig));
+      setIsConfigured(true);
+    }
+  }, []);
+  
+  const handleSetupComplete = (newConfig: UserAgentConfig) => {
+    setConfig(newConfig);
+    setIsConfigured(true);
+    localStorage.setItem('user_agent_config', JSON.stringify(newConfig));
+  };
+  
+  // Mostrar wizard si no está configurado
+  if (!isConfigured) {
+    return (
+      <>
+        <style>{setupWizardStyles}</style>
+        <SetupWizard onComplete={handleSetupComplete} />
+      </>
+    );
   }
+  
+  // UI principal
+  return (
+    <div className="app">
+      <style>{credentialPanelStyles}</style>
+      <style>{pluginManagerStyles}</style>
+      
+      <nav className="app-nav">
+        <button onClick={() => setCurrentView('dashboard')}>🏠 Dashboard</button>
+        <button onClick={() => setCurrentView('credentials')}>🔐 Credenciales</button>
+        <button onClick={() => setCurrentView('plugins')}>🔌 Plugins</button>
+      </nav>
+      
+      <main className="app-main">
+        {currentView === 'dashboard' && (
+          <div>
+            {/* Tu dashboard del Copiloto Maestro */}
+            <h1>Dashboard</h1>
+            <p>Configuración de usuario: {config?.profile.role}</p>
+          </div>
+        )}
+        
+        {currentView === 'credentials' && <CredentialPanel />}
+        
+        {currentView === 'plugins' && <PluginManager />}
+      </main>
+    </div>
+  );
 }
+
+export default App;
 ```
-
-### Modificar Umbrales
-
-Edita los archivos:
-- `pattern-detector.ts` - Umbrales de detección
-- `evolution-engine.ts` - Criterios de evolución
-- `storage.ts` - Debouncing y cuotas
 
 ---
 
-## 📝 Comandos de Terminal Completos
+## 🎯 Guía de Uso
 
-```bash
-# ESTADO
-status          # Estado completo del sistema
-stats           # Estadísticas detalladas
-patterns        # Patrones detectados
+### 1. Primera Vez: Wizard de Configuración
 
-# REGLAS
-rules           # Listar todas
-rules show <id> # Ver detalles
-test <id>       # Probar regla
+Al abrir la app por primera vez, verás el wizard de 6 pasos:
 
-# OPERACIONES
-interact <type> <desc>    # Registrar interacción
-decide <json>             # Evaluar decisión
-evolve                    # Ciclo de evolución
+1. **Selección de Rol** - Define tu rol principal (backend dev, frontend, etc)
+2. **Fuentes de Conocimiento** - Selecciona de dónde aprenderá el agente
+3. **Importar Documentación** - Sube PDFs/Markdown con tus guías
+4. **Reglas Personalizadas** - Define reglas basadas en tu rol
+5. **Conectores MCP** - Información sobre conectores disponibles
+6. **Resumen** - Revisa tu configuración
 
-# UTILIDADES
-backup          # Crear backup
-reset           # Reiniciar sistema
-clear           # Limpiar terminal
-help            # Ayuda
+### 2. Panel de Credenciales
+
+#### Inicialización
+
+Al abrir el panel por primera vez:
+
+```
+1. Ingresa una contraseña maestra
+2. Esta contraseña encripta todas tus credenciales
+3. ⚠️ NO la olvides - no es recuperable
+```
+
+#### Agregar Credencial
+
+```
+1. Click en "+ Agregar Credencial"
+2. Selecciona un servicio (NotebookLM, GitHub, etc)
+3. Completa los campos requeridos
+4. Click en "Guardar Credencial"
+```
+
+#### Plantillas Disponibles
+
+- **NotebookLM**: API Key + Notebook ID
+- **GitHub**: Personal Access Token + Repos
+- **Anthropic**: API Key (para importador con IA)
+- **Notion**: Integration Token
+- **API Personalizada**: Endpoint + API Key
+
+### 3. Gestor de Plugins
+
+#### Plugins Built-in
+
+**Conectores:**
+- 📓 **NotebookLM Connector** - Conecta tus cuadernos
+- 💻 **GitHub Connector** - Aprende de commits y PRs
+
+**Importadores:**
+- 📄 **AI Documentation Importer** - Extrae reglas con Claude
+- 📝 **Markdown Importer** - Importa desde Markdown estructurado
+
+#### Habilitar Plugin
+
+```
+1. Ve al Gestor de Plugins
+2. Encuentra el plugin que quieres usar
+3. Activa el switch
+4. Si requiere config, click en "⚙️ Configurar"
+```
+
+#### Configurar Plugin
+
+Ejemplo: Configurar GitHub Connector
+
+```
+1. Click en "⚙️ Configurar"
+2. Ingresa repos: "user/repo1, user/repo2"
+3. Activa "Rastrear Commits"
+4. Activa "Rastrear Pull Requests"
+5. Guarda
+```
+
+### 4. Importar Documentación
+
+#### Método 1: Con IA (Recomendado)
+
+```typescript
+// Requiere Anthropic API Key configurada
+
+1. Ve al Wizard (paso 3) o usa directamente el importador
+2. Sube tu PDF/Markdown
+3. El sistema usa Claude para extraer reglas automáticamente
+4. Revisa las reglas extraídas
+5. Activa las que quieras usar
+```
+
+#### Método 2: Markdown Estructurado
+
+Crea un archivo `.md` con este formato:
+
+```markdown
+## Regla: Nunca deployear sin tests
+
+**Condición:** action.type == 'deploy'
+**Comportamiento:** require_tests_first
+**Categoría:** safety
+
+## Regla: Validar env vars en producción
+
+**Condición:** action.type == 'deploy' and target == 'production'
+**Comportamiento:** check_env_completeness
+**Categoría:** security
+```
+
+Luego importa el archivo.
+
+---
+
+## 🔌 Usar Conectores MCP
+
+### Ejemplo: NotebookLM
+
+```typescript
+import { NotebookLMConnector } from './mcp-connector';
+import { CredentialManager } from './credential-manager';
+
+// 1. Inicializar gestor de credenciales
+const credManager = CredentialManager.getInstance();
+await credManager.initialize('tu-contraseña-maestra');
+
+// 2. Crear conector
+const connector = new NotebookLMConnector({
+  endpoint: 'https://notebooklm.google.com/api/v1',
+  requiresAuth: true,
+  authType: 'api_key',
+});
+
+// 3. Conectar
+await connector.connect({
+  apiKey: 'nlm_tu_api_key',
+  notebookId: 'tu_notebook_id',
+});
+
+// 4. Consultar conocimiento
+const response = await connector.query(
+  '¿Cuáles son las mejores prácticas de deploy en producción?'
+);
+
+console.log(response.data);
+```
+
+### Ejemplo: GitHub
+
+```typescript
+import { GitHubConnector } from './mcp-connector';
+
+const github = new GitHubConnector();
+
+await github.connect({
+  token: 'ghp_tu_token',
+  repos: 'user/repo1,user/repo2',
+});
+
+// Obtener commits recientes
+const commits = await github.getRecentCommits(50);
+
+// El conector puede auto-registrar interacciones
+// basándose en commits, PRs, etc.
+```
+
+---
+
+## 🛡️ Seguridad
+
+### Encriptación
+
+- **Algoritmo**: AES-256-GCM
+- **Derivación de clave**: PBKDF2 con 100,000 iteraciones
+- **Salt**: Aleatorio de 128 bits
+- **IV**: Aleatorio por cada credencial
+
+### Almacenamiento
+
+- Las credenciales se guardan encriptadas en `localStorage`
+- La contraseña maestra **NO** se almacena
+- Cada sesión requiere re-ingresar la contraseña
+
+### Buenas Prácticas
+
+```
+✅ Usa contraseñas maestras fuertes (12+ caracteres)
+✅ Haz backups periódicos (exporta credenciales)
+✅ No compartas tu contraseña maestra
+⚠️ Si olvidas la contraseña, perderás acceso a credenciales
+```
+
+---
+
+## 🔄 Flujo de Trabajo Típico
+
+### Setup Inicial (Una vez)
+
+```
+1. Abrir app → Wizard de configuración
+2. Seleccionar rol y experiencia
+3. Importar documentación (guías, best practices)
+4. Configurar credenciales en Panel
+5. Habilitar plugins necesarios
+6. ¡Listo para usar!
+```
+
+### Uso Diario
+
+```
+1. Abrir app (ingresa contraseña maestra)
+2. Interactuar con el agente normalmente
+3. El agente consulta automáticamente:
+   - Reglas personalizadas
+   - Conocimiento importado
+   - Conectores MCP configurados
+4. Obtén sugerencias contextualizadas a TU flujo
+```
+
+### Mantenimiento
+
+```
+Semanal:
+  - Importar nueva documentación si hay cambios
+  - Revisar y ajustar reglas que no funcionan bien
+
+Mensual:
+  - Hacer backup de credenciales
+  - Actualizar plugins si hay nuevas versiones
+```
+
+---
+
+## 📚 API Reference
+
+### CredentialManager
+
+```typescript
+// Inicializar
+await credManager.initialize('contraseña');
+
+// Guardar credencial
+await credManager.saveCredential(
+  'id_unico',
+  'Nombre mostrado',
+  'servicio',
+  'api_key',
+  { apiKey: 'valor', otrosCampos: 'valores' }
+);
+
+// Obtener credencial
+const creds = await credManager.getCredential('id_unico');
+
+// Listar todas (sin datos sensibles)
+const lista = credManager.listCredentials();
+
+// Probar conexión
+const valida = await credManager.testCredential('id_unico');
+
+// Eliminar
+await credManager.deleteCredential('id_unico');
+```
+
+### MCPConnector
+
+```typescript
+// Crear conector
+const connector = MCPConnectorFactory.create('notebooklm', config);
+
+// Conectar
+await connector.connect(credentials);
+
+// Consultar
+const response = await connector.query('pregunta', contexto);
+
+// Buscar
+const resultados = await connector.search('query');
+
+// Agregar contexto
+await connector.addContext(datos);
+
+// Sincronizar
+await connector.sync();
+```
+
+### DocumentationImporter
+
+```typescript
+// Crear importador
+const importer = new AIDocumentationImporter(apiKey);
+
+// Importar archivo
+const result = await importer.import(file);
+
+// Resultado contiene:
+result.rulesExtracted;  // Array de reglas
+result.domainsCreated;  // Dominios detectados
+result.patternsDetected; // Patrones encontrados
+```
+
+### PluginRegistry
+
+```typescript
+// Obtener instancia
+const registry = PluginRegistry.getInstance();
+
+// Registrar plugin
+await registry.register(pluginDefinition);
+
+// Habilitar/deshabilitar
+await registry.enable('plugin-id');
+await registry.disable('plugin-id');
+
+// Obtener plugins
+const todos = registry.getAll();
+const habilitados = registry.getEnabled();
+const porCategoria = registry.getByCategory('connector');
+
+// Ejecutar hook
+await registry.executeHook('onInteraction', interactionLog);
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-**No veo mis datos:**
-- Verifica que localStorage esté habilitado
-- Revisa la consola del navegador (F12)
+### Error: "Master key no disponible"
 
-**El sistema está lento:**
-- Revisa `$ stats` - uso de storage
-- Si >80% lleno, ejecuta `$ reset`
-
-**Las reglas no se activan:**
-- Verifica que estén activas: `$ rules`
-- Prueba con: `$ test <rule_id>`
-
-**Quiero empezar de cero:**
-```bash
-$ reset
-# Confirma con "Sí"
-```
-
----
-
-## 📚 Documentación Completa
-
-Ve `DOCUMENTACION.md` para:
-- Detalles técnicos de cada componente
-- API completa de cada motor
-- Flujos de datos
-- Criterios de evolución
-- Configuración avanzada
-
----
-
-## ✨ Features Destacados
-
-### 1. Parser AST Real
-No usa `eval()`. Parsea y evalúa condiciones de forma segura.
-
+**Causa**: No has inicializado el CredentialManager
+**Solución**:
 ```typescript
-// Condición compleja
-"action.type == 'delete' and file.size > 1MB or action.type == 'remove'"
-
-// Se evalúa correctamente contra cualquier contexto
+await credManager.initialize('tu-contraseña');
 ```
 
-### 2. Detección de Patrones Multi-Dimensional
+### Error: Credenciales inválidas
 
-- **Secuencial:** A → B → C (con timing)
-- **Temporal:** Acciones en horarios específicos
-- **Frecuencia:** Repeticiones por día/hora
-- **Contextual:** Agrupación por keywords
+**Causa**: API key o token incorrectos
+**Solución**:
+1. Verifica credenciales en el servicio original
+2. Re-ingresa en el Panel de Credenciales
+3. Click en "Probar Conexión"
 
-### 3. Evolución Adaptativa
+### Importador no extrae reglas
 
-El sistema aprende:
-- Qué reglas funcionan (success rate)
-- Cuáles deprecar (baja performance)
-- Cuándo crear nuevas (desde patrones)
-- Cómo optimizar (A/B testing con shadow mode)
+**Causa**: Falta configurar Anthropic API Key
+**Solución**:
+1. Ve al Gestor de Plugins
+2. Configura "AI Documentation Importer"
+3. Ingresa tu API Key de Anthropic
 
-### 4. Terminal Interactiva
+### Plugin no se habilita
 
-No es decorativa. Es funcional:
-- Historial de comandos (↑↓)
-- Autocompletado implícito
-- Timestamps en outputs
-- Color-coding por tipo
-
----
-
-## 🎓 Aprende Más
-
-**Flujo recomendado:**
-
-1. ✅ **Explora** UI (10 min)
-2. ✅ **Prueba** terminal (15 min)
-3. ✅ **Genera** patrones (20 min)
-4. ✅ **Ejecuta** evolución (10 min)
-5. ✅ **Lee** documentación técnica
-6. ✅ **Modifica** código fuente
+**Causa**: Faltan permisos o dependencias
+**Solución**:
+1. Revisa los "Permisos" requeridos en la tarjeta del plugin
+2. Verifica que las credenciales necesarias estén configuradas
+3. Revisa consola del navegador para errores
 
 ---
 
-## 🚀 Próximos Pasos
+## 🚀 Próximas Mejoras
 
-**Si quieres extender:**
-
-1. **Agregar ML real:** TensorFlow.js
-2. **Escalabilidad:** IndexedDB en lugar de localStorage
-3. **Async:** WebWorkers para procesamiento
-4. **Cloud:** Sincronización en la nube
-5. **Viz:** Gráficos con D3.js
-6. **Testing:** Suite completa con Vitest
+- [ ] Sincronización en la nube (multi-dispositivo)
+- [ ] Marketplace de plugins community
+- [ ] Exportar/Importar configuración completa
+- [ ] Estadísticas de uso de conectores
+- [ ] Editor visual de reglas
+- [ ] Templates de configuración por industria
 
 ---
 
-## 📦 Estructura de Archivos
+## 📄 Licencia
 
-```
-copilot-master/
-├── copilot-master.html         # Aplicación compilada (todo-en-uno)
-├── DOCUMENTACION.md            # Docs técnicas completas
-├── README.md                   # Esta guía
-└── src/                        # Código fuente (si quieres modificar)
-    ├── storage.ts              # Motor de persistencia
-    ├── decision-engine.ts      # Evaluador de reglas
-    ├── pattern-detector.ts     # Detector de patrones
-    ├── evolution-engine.ts     # Motor de evolución
-    ├── store.ts                # Estado global
-    ├── types.ts                # Tipos TypeScript
-    └── components/
-        ├── Terminal.tsx        # Terminal interactiva
-        ├── DecisionEngine.tsx  # UI motor decisiones
-        └── ...
-```
+MIT License - Úsalo libremente en tus proyectos
 
 ---
 
-## 💬 Tips Finales
+## 💬 Soporte
 
-1. **Experimenta sin miedo** - Todo persiste, puedes hacer reset
-2. **Usa la terminal** - Es la forma más directa de interactuar
-3. **Genera patrones** - El sistema mejora con uso
-4. **Observa la evolución** - Verás cómo se adapta
-5. **Lee el código** - Está limpio y bien documentado
+¿Preguntas? ¿Bugs? ¿Ideas?
+
+- Abre un issue en GitHub
+- Contacta al equipo de desarrollo
+- Consulta la documentación completa
 
 ---
 
-**¡Disfruta tu Copiloto Maestro! 🎉**
-
-Si encuentras bugs o tienes ideas, ¡adelante con las mejoras!
+**¡Disfruta tu agente personalizado!** 🎉
