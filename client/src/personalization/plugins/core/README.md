@@ -95,3 +95,69 @@ Ambos plugins se pueden configurar a través del panel de usuario en la interfaz
 
 - **Fase 2:** Web Search MCP, Task Scheduler MCP
 - **Fase 3:** VectorDB-in-memory, LocalAI/Ollama Connector
+
+### 3. Web Search MCP (`web-search-mcp.ts`)
+
+Proporciona búsqueda web local y extracción de contenido.
+
+**Características:**
+- Descarga de URLs con manejo de errores
+- Extracción automática de contenido principal
+- Búsqueda por palabra clave en múltiples URLs
+- Parsing de HTML con cheerio
+
+**Seguridad:**
+- Validación de URLs para prevenir SSRF
+- Límite de tamaño de contenido
+- Timeout configurable
+- User-Agent personalizado
+
+**Uso:**
+```typescript
+const connector = new WebSearchMCPConnector({
+  timeout: 30000,
+  maxContentLength: 5 * 1024 * 1024
+});
+
+const result = await connector.fetchAndParse('https://example.com');
+```
+
+### 4. Task Scheduler MCP (`task-scheduler-mcp.ts`)
+
+Proporciona programación proactiva de tareas.
+
+**Características:**
+- Programación con expresiones cron
+- Programación con intervalos
+- Ejecución manual de tareas
+- Listado y gestión de tareas
+- Persistencia local de tareas
+
+**Seguridad:**
+- Validación de expresiones cron
+- Límite de tareas concurrentes
+- Manejo de errores en ejecución
+
+**Uso:**
+```typescript
+const connector = new TaskSchedulerMCPConnector({
+  persistenceFilePath: './.agent-tasks.json',
+  maxConcurrentTasks: 5
+});
+
+await connector.scheduleTask({
+  id: 'daily-check',
+  name: 'Verificación Diaria',
+  cronExpression: '0 0 * * *',
+  command: 'shell.execute',
+  args: { command: 'npm test' }
+});
+```
+
+## Fase 2 Completada
+
+Los plugins de la Fase 2 (Web Search MCP y Task Scheduler MCP) han sido integrados exitosamente en el sistema core de Agent00.
+
+## Próximas Fases
+
+- **Fase 3:** VectorDB-in-memory, LocalAI/Ollama Connector

@@ -6,6 +6,8 @@
 
 import { FileSystemMCPConnector, FileSystemConfig } from './file-system-mcp';
 import { ShellMCPConnector, ShellConfig } from './shell-mcp';
+import { WebSearchMCPConnector, WebSearchConfig } from './web-search-mcp';
+import { TaskSchedulerMCPConnector, TaskSchedulerConfig } from './task-scheduler-mcp';
 import { CopilotPlugin } from '../../lib/personalization-types';
 import { PluginRegistry } from '../../lib/plugin-registry';
 
@@ -207,6 +209,178 @@ export function registerCorePlugins(registry: PluginRegistry): void {
     },
   };
   
+  // ============================================
+  // PLUGIN: WEB SEARCH MCP
+  // ============================================
+  
+  const webSearchConnector = new WebSearchMCPConnector({
+    timeout: 30000,
+    maxContentLength: 5 * 1024 * 1024,
+  });
+  
+  const webSearchPlugin: CopilotPlugin = {
+    id: 'websearch-core',
+    name: 'Web Search',
+    version: '1.0.0',
+    author: 'Agent00 Core',
+    description: 'Búsqueda web local con extracción de contenido. Permite al agente acceder y procesar información de URLs sin depender de APIs externas.',
+    icon: '🔍',
+    category: 'connector',
+    enabled: true,
+    installed: true,
+    installedAt: new Date().toISOString(),
+    
+    requires: {
+      permissions: ['network:external', 'read:interactions', 'write:interactions'],
+    },
+    
+    settings: [
+      {
+        key: 'timeout',
+        label: 'Timeout (ms)',
+        type: 'number',
+        default: 30000,
+        description: 'Tiempo máximo para descargar una página',
+        required: false,
+      },
+      {
+        key: 'maxContentLength',
+        label: 'Longitud Máxima de Contenido (MB)',
+        type: 'number',
+        default: 5,
+        description: 'Tamaño máximo de contenido a procesar',
+        required: false,
+      },
+    ],
+    
+    connector: webSearchConnector,
+    
+    contributes: {
+      commands: [
+        {
+          id: 'websearch.fetchUrl',
+          name: 'Descargar URL',
+          description: 'Descarga el contenido HTML de una URL',
+          execute: async (args: any) => webSearchConnector.fetchUrl(args.url),
+        },
+        {
+          id: 'websearch.fetchAndParse',
+          name: 'Descargar y Procesar URL',
+          description: 'Descarga una URL y extrae el contenido principal',
+          execute: async (args: any) => webSearchConnector.fetchAndParse(args.url),
+        },
+        {
+          id: 'websearch.searchUrls',
+          name: 'Buscar en URLs',
+          description: 'Busca y procesa múltiples URLs',
+          execute: async (args: any) => webSearchConnector.searchUrls(args.urls),
+        },
+        {
+          id: 'websearch.searchByKeyword',
+          name: 'Buscar por Palabra Clave',
+          description: 'Busca una palabra clave en un conjunto de URLs',
+          execute: async (args: any) => webSearchConnector.searchByKeyword(args.keyword, args.urls),
+        },
+      ],
+    },
+    
+    hooks: {
+      onEnable: async () => {
+        console.log('✅ Web Search MCP habilitado');
+        await webSearchConnector.connect();
+      },
+      onDisable: async () => {
+        console.log('⏸️ Web Search MCP deshabilitado');
+        await webSearchConnector.disconnect();
+      },
+    },
+  };
+  
+  // ============================================
+  // PLUGIN: TASK SCHEDULER MCP
+  // ============================================
+  
+  const taskSchedulerConnector = new TaskSchedulerMCPConnector({
+    persistenceFilePath: './.agent-tasks.json',
+    maxConcurrentTasks: 5,
+  });
+  
+  const taskSchedulerPlugin: CopilotPlugin = {
+    id: 'taskscheduler-core',
+    name: 'Task Scheduler',
+    version: '1.0.0',
+    author: 'Agent00 Core',
+    description: 'Programación proactiva de tareas con expresiones cron e intervalos. Permite al agente ejecutar acciones de forma automática y periódica.',
+    icon: '⏰',
+    category: 'connector',
+    enabled: true,
+    installed: true,
+    installedAt: new Date().toISOString(),
+    
+    requires: {
+      permissions: ['storage:local', 'read:interactions', 'write:interactions'],
+    },
+    
+    settings: [
+      {
+        key: 'maxConcurrentTasks',
+        label: 'Máximo de Tareas Concurrentes',
+        type: 'number',
+        default: 5,
+        description: 'Número máximo de tareas que pueden ejecutarse simultáneamente',
+        required: false,
+      },
+    ],
+    
+    connector: taskSchedulerConnector,
+    
+    contributes: {
+      commands: [
+        {
+          id: 'scheduler.scheduleTask',
+          name: 'Programar Tarea',
+          description: 'Programa una nueva tarea con expresión cron o intervalo',
+          execute: async (args: any) => taskSchedulerConnector.scheduleTask(args.task),
+        },
+        {
+          id: 'scheduler.executeTask',
+          name: 'Ejecutar Tarea',
+          description: 'Ejecuta una tarea manualmente',
+          execute: async (args: any) => taskSchedulerConnector.executeTask(args.taskId),
+        },
+        {
+          id: 'scheduler.cancelTask',
+          name: 'Cancelar Tarea',
+          description: 'Cancela una tarea programada',
+          execute: async (args: any) => taskSchedulerConnector.cancelTask(args.taskId),
+        },
+        {
+          id: 'scheduler.listTasks',
+          name: 'Listar Tareas',
+          description: 'Lista todas las tareas programadas',
+          execute: async (args: any) => taskSchedulerConnector.listTasks(args.filter),
+        },
+        {
+          id: 'scheduler.getTask',
+          name: 'Obtener Tarea',
+          description: 'Obtiene información de una tarea específica',
+          execute: async (args: any) => taskSchedulerConnector.getTask(args.taskId),
+        },
+      ],
+    },
+    
+    hooks: {
+      onEnable: async () => {
+        console.log('✅ Task Scheduler MCP habilitado');
+        await taskSchedulerConnector.connect();
+      },
+      onDisable: async () => {
+        console.log('⏸️ Task Scheduler MCP deshabilitado');
+        await taskSchedulerConnector.disconnect();
+      },
+    },
+  };
+  
   // Registrar plugins
   try {
     registry.register(fileSystemPlugin);
@@ -221,8 +395,22 @@ export function registerCorePlugins(registry: PluginRegistry): void {
   } catch (error) {
     console.error('❌ Error registrando Super Shell:', error);
   }
-}
+  
+  try {
+    registry.register(webSearchPlugin);
+    console.log('✅ Plugin Web Search registrado');
+  } catch (error) {
+    console.error('❌ Error registrando Web Search:', error);
+  }
+  
+  try {
+    registry.register(taskSchedulerPlugin);
+    console.log('✅ Plugin Task Scheduler registrado');
+  } catch (error) {
+    console.error('❌ Error registrando Task Scheduler:', error);
+  }
+
 
 // Exportar conectores para uso directo si es necesario
-export { FileSystemMCPConnector, ShellMCPConnector };
-export type { FileSystemConfig, ShellConfig };
+export { FileSystemMCPConnector, ShellMCPConnector, WebSearchMCPConnector, TaskSchedulerMCPConnector };
+export type { FileSystemConfig, ShellConfig, WebSearchConfig, TaskSchedulerConfig };
