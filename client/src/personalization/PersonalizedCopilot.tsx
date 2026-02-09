@@ -10,13 +10,13 @@
 import React, { useState, useEffect } from 'react';
 
 // Importar tipos
-import { UserAgentConfig, CopilotPlugin, MCPConnector } from './personalization-types';
+import { UserAgentConfig, CopilotPlugin, MCPConnector } from './lib/personalization-types';
 
 // Importar gestores
-import { CredentialManager } from './credential-manager';
-import { PluginRegistry, registerBuiltInPlugins } from './plugin-registry';
-import { MCPConnectorFactory } from './mcp-connector';
-import { AIDocumentationImporter } from './documentation-importer';
+import { CredentialManager } from './lib/credential-manager';
+import { PluginRegistry, registerBuiltInPlugins } from './lib/plugin-registry';
+import { MCPConnectorFactory } from './lib/mcp-connector';
+import { AIDocumentationImporter } from './lib/documentation-importer';
 
 // Importar componentes UI
 import { SetupWizard } from './components/SetupWizard';
@@ -24,10 +24,20 @@ import { CredentialPanel } from './components/CredentialPanel';
 import { PluginManager } from './components/PluginManager';
 
 // Importar del Copiloto Maestro base (ajusta las rutas según tu estructura)
-import { useAppState } from './store';
-import { DecisionEngine } from './decision-engine';
-import { PatternDetector } from './pattern-detector';
-import { EvolutionEngine } from './evolution-engine';
+// TODO: Implementar useAppState o conectar con el estado global existente
+// import { useAppState } from '@/store';
+// import { DecisionEngine } from '@/engines/decision-engine';
+// import { PatternDetector } from '@/engines/pattern-detector';
+// import { EvolutionEngine } from '@/engines/evolution-engine';
+
+// Hook temporal hasta que se implemente la integración completa
+function useAppState() {
+  return {
+    rules: [],
+    decisionEngine: { evaluateRules: () => [] },
+    recordInteraction: () => ({}),
+  };
+}
 
 // ============================================
 // HOOK PERSONALIZADO: usePersonalization
