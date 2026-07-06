@@ -222,8 +222,9 @@ function AddCredentialModal({
       if (field.required && !formValues[field.key]) {
         newErrors[field.key] = 'Campo requerido';
       }
-      if (field.validation && formValues[field.key]) {
-        const result = field.validation(formValues[field.key]);
+      const validate = (field as { validation?: (value: string) => true | string }).validation;
+      if (validate && formValues[field.key]) {
+        const result = validate(formValues[field.key]);
         if (result !== true) {
           newErrors[field.key] = typeof result === 'string' ? result : 'Valor inválido';
         }

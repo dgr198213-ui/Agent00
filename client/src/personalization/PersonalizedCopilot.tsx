@@ -254,7 +254,7 @@ export function usePersonalization() {
       return { success: false, error: 'No se pudieron extraer reglas' };
     } catch (error) {
       console.error('Error importando documentación:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   };
   
@@ -294,7 +294,7 @@ export function usePersonalization() {
       return { success: true, connector };
     } catch (error) {
       console.error('Error conectando MCP:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   };
   
@@ -418,7 +418,7 @@ export function PersonalizedCopilot() {
         
         {currentView === 'terminal' && (
           <Terminal
-            onCommand={(cmd, args) => {
+            onCommand={(cmd: string, args: string[]) => {
               // Manejar comandos de terminal
               // Integrar con el terminal existente
             }}
@@ -484,7 +484,7 @@ function Dashboard({
       const result = await onEvaluate(context);
       setResults(result);
     } catch (error) {
-      alert('Error evaluando: ' + error.message);
+      alert('Error evaluando: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
   

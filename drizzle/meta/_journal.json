@@ -15,6 +15,13 @@
       "when": 1770567772759,
       "tag": "0001_slippery_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783321439626,
+      "tag": "0002_glossy_blacklash",
+      "breakpoints": true
     }
   ]
 }

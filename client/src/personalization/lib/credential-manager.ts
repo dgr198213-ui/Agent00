@@ -249,8 +249,8 @@ export class CredentialManager {
   
   private async persistCredentials(): Promise<void> {
     const data = Array.from(this.credentials.entries()).map(([id, cred]) => ({
-      id,
       ...cred,
+      id,
     }));
     
     localStorage.setItem('encrypted_credentials', JSON.stringify(data));
@@ -274,8 +274,8 @@ export class CredentialManager {
   // UTILIDADES
   // ============================================
   
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
+  private arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);

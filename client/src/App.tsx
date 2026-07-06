@@ -1,39 +1,51 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import AgentsPage from "./features/agents/AgentsPage";
+import AgentEditorPage from "./features/agents/AgentEditorPage";
+import KnowledgePage from "./features/knowledge/KnowledgePage";
+import ToolsPage from "./features/tools/ToolsPage";
+import PlaygroundPage from "./features/playground/PlaygroundPage";
+import DeployPage from "./features/deployment/DeployPage";
+import SettingsPage from "./features/settings/SettingsPage";
 import CopilotDashboard from "./pages/CopilotDashboard";
 import { PersonalizedCopilot } from "./personalization";
 
+/**
+ * Rutas del producto. Flujo principal:
+ * Agents → Knowledge → Tools → Playground → Deploy
+ */
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/">
+        <Redirect to="/agents" />
+      </Route>
+      <Route path="/agents" component={AgentsPage} />
+      <Route path="/agents/:id" component={AgentEditorPage} />
+      <Route path="/knowledge" component={KnowledgePage} />
+      <Route path="/tools" component={ToolsPage} />
+      <Route path="/playground" component={PlaygroundPage} />
+      <Route path="/deploy" component={DeployPage} />
+      <Route path="/settings" component={SettingsPage} />
+
+      {/* Módulos legados, accesibles desde Settings */}
       <Route path="/copilot" component={CopilotDashboard} />
       <Route path="/personalized" component={PersonalizedCopilot} />
+
       <Route path="/404" component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="dark"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
           <Router />

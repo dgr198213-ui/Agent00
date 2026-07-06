@@ -204,10 +204,11 @@ Responde SOLO con un array JSON, sin texto adicional:
             behavior: line.trim(),
             confidence: 0.5,
             active: false, // Deshabilitada por defecto para revisión
-            createdAt: new Date().toISOString(),
-            source: 'basic_extraction',
+            priority: 50,
+            createdAt: new Date(),
+            updatedAt: new Date(),
             description: 'Extraída automáticamente. Requiere revisión.',
-            performance: 0.5,
+            metadata: { source: 'basic_extraction', performance: 0.5 },
           });
         }
       });
@@ -227,12 +228,14 @@ Responde SOLO con un array JSON, sin texto adicional:
     if (workflowMatches) {
       workflowMatches.forEach((match, index) => {
         patterns.push({
+          id: `pattern_${Date.now()}_${index}`,
           type: 'sequential',
+          name: `workflow_${index}`,
           description: match.trim(),
           confidence: 0.7,
           occurrences: 0,
-          detectedAt: new Date().toISOString(),
-          suggestedRule: `workflow_${index}`,
+          lastDetected: new Date(),
+          suggestedRule: { name: `workflow_${index}` },
         });
       });
     }
@@ -416,11 +419,13 @@ export class MarkdownImporter implements DocumentImporter {
           category,
           condition,
           behavior,
+          description: null,
           confidence: 0.8,
           active: true,
-          createdAt: new Date().toISOString(),
-          source: 'markdown',
-          performance: 0.5,
+          priority: 50,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          metadata: { source: 'markdown', performance: 0.5 },
         });
       }
     });

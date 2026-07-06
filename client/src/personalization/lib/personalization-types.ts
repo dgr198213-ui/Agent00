@@ -165,6 +165,7 @@ export interface PluginSetting {
   default?: any;
   required?: boolean;
   description?: string;
+  placeholder?: string;
   options?: { label: string; value: any }[];
 }
 
