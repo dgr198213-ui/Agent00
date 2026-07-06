@@ -85,7 +85,7 @@ export const deploymentService = {
     const sections: string[] = [
       agent.systemPrompt?.trim() || `Eres ${agent.name}. ${agent.description ?? ""}`.trim(),
     ];
-    const knowledgeContext = await knowledgeService.buildContext(agent.id);
+    const knowledgeContext = await knowledgeService.buildContext(agent.id, 12_000, userMessage);
     if (knowledgeContext) sections.push(`## Conocimiento del agente\n${knowledgeContext}`);
     const memories = await memoryRepository.listByAgent(agent.id, agent.userId);
     if (memories.length > 0) {

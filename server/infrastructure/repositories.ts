@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import {
   agents,
   agentKnowledge,
+  knowledgeChunks,
   agentTools,
   agentMemories,
   conversations,
@@ -16,6 +17,8 @@ import {
   type InsertAgent,
   type AgentKnowledge,
   type InsertAgentKnowledge,
+  type KnowledgeChunk,
+  type InsertKnowledgeChunk,
   type AgentTool,
   type InsertAgentTool,
   type AgentMemory,
@@ -29,6 +32,7 @@ import { getDb } from "../db";
 import type {
   AgentRepository,
   KnowledgeRepository,
+  ChunkRepository,
   ToolRepository,
   MemoryRepository,
   ConversationRepository,
@@ -115,6 +119,41 @@ export const knowledgeRepository: KnowledgeRepository = {
   async delete(id: string): Promise<void> {
     const db = await requireDb();
     await db.delete(agentKnowledge).where(eq(agentKnowledge.id, id));
+  },
+};
+
+// ============================================================================
+// KNOWLEDGE CHUNKS
+// ============================================================================
+
+export const chunkRepository: ChunkRepository = {
+  async listByAgent(agentId: string): Promise<KnowledgeChunk[]> {
+    const db = await requireDb();
+    return db
+      .select()
+      .from(knowledgeChunks)
+      .where(eq(knowledgeChunks.agentId, agentId))
+      .orderBy(knowledgeChunks.knowledgeId, knowledgeChunks.chunkIndex);
+  },
+
+  async createMany(chunks: InsertKnowledgeChunk[]): Promise<void> {
+    if (chunks.length === 0) return;
+    const db = await requireDb();
+    // Insertar por lotes para no exceder el tamaño máximo de paquete MySQL.
+    const BATCH = 50;
+    for (let i = 0; i < chunks.length; i += BATCH) {
+      await db.insert(knowledgeChunks).values(chunks.slice(i, i + BATCH));
+    }
+  },
+
+  async deleteByKnowledgeId(knowledgeId: string): Promise<void> {
+    const db = await requireDb();
+    await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeId, knowledgeId));
+  },
+
+  async deleteByAgentId(agentId: string): Promise<void> {
+    const db = await requireDb();
+    await db.delete(knowledgeChunks).where(eq(knowledgeChunks.agentId, agentId));
   },
 };
 

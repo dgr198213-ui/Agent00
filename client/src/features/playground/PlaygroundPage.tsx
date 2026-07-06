@@ -44,19 +44,105 @@ export default function PlaygroundPage() {
     onError: e => toast.error(e.message),
   });
 
+  // Streaming (SSE): texto parcial del turno en curso y última herramienta usada.
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState("");
+  const [streamTool, setStreamTool] = useState<string | null>(null);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+
+  const sendStreaming = async (message: string) => {
+    if (!agentId) return;
+    setStreaming(true);
+    setStreamText("");
+    setStreamTool(null);
+    setPendingUserMessage(message);
+
+    try {
+      const response = await fetch("/api/playground/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ agentId, message, conversationId }),
+      });
+      if (!response.ok || !response.body) throw new Error("stream-unavailable");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finished = false;
+
+      const handleEvent = (raw: string) => {
+        const line = raw.trim();
+        if (!line.startsWith("data:")) return;
+        let event: {
+          type: string;
+          text?: string;
+          name?: string;
+          message?: string;
+          conversationId?: string;
+        };
+        try {
+          event = JSON.parse(line.slice(5).trim());
+        } catch {
+          return;
+        }
+        if (event.type === "token" && event.text) {
+          setStreamText(prev => prev + event.text);
+        } else if (event.type === "tool") {
+          // El turno anterior era una decisión de herramienta: descartar parcial.
+          setStreamText("");
+          setStreamTool(event.name ?? null);
+        } else if (event.type === "done" && event.conversationId) {
+          finished = true;
+          setConversationId(event.conversationId);
+          utils.playground.messages.invalidate({ conversationId: event.conversationId });
+          utils.playground.conversations.invalidate({ agentId });
+        } else if (event.type === "error") {
+          finished = true;
+          toast.error(event.message ?? "Error en el agente");
+        }
+      };
+
+      // Los eventos SSE van separados por doble salto de línea.
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let separator = buffer.indexOf("\n\n");
+        while (separator >= 0) {
+          handleEvent(buffer.slice(0, separator));
+          buffer = buffer.slice(separator + 2);
+          separator = buffer.indexOf("\n\n");
+        }
+      }
+      if (buffer.trim()) handleEvent(buffer);
+      if (!finished) throw new Error("stream-incomplete");
+    } catch {
+      // Fallback: mutación tRPC clásica (sin streaming).
+      chat.mutate({ agentId, message, conversationId });
+    } finally {
+      setStreaming(false);
+      setStreamText("");
+      setStreamTool(null);
+      setPendingUserMessage(null);
+    }
+  };
+
   useEffect(() => {
     setConversationId(undefined);
   }, [agentId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, chat.isPending]);
+  }, [messages, chat.isPending, streamText, streaming]);
+
+  const busy = chat.isPending || streaming;
 
   const send = () => {
     const message = input.trim();
-    if (!message || !agentId || chat.isPending) return;
+    if (!message || !agentId || busy) return;
     setInput("");
-    chat.mutate({ agentId, message, conversationId });
+    void sendStreaming(message);
   };
 
   return (
@@ -128,12 +214,33 @@ export default function PlaygroundPage() {
                         )}
                       </div>
                     ))}
-                  {chat.isPending && (
+                  {streaming && pendingUserMessage && (
+                    <div className="flex justify-end">
+                      <div className="rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-wrap break-words text-sm bg-primary text-primary-foreground">
+                        {pendingUserMessage}
+                      </div>
+                    </div>
+                  )}
+                  {streaming && streamTool && !streamText && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <Wrench className="h-3.5 w-3.5" />
+                      Usando la herramienta {streamTool}…
+                    </div>
+                  )}
+                  {streaming && streamText && (
+                    <div className="flex justify-start">
+                      <div className="rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-wrap break-words text-sm bg-muted">
+                        {streamText}
+                        <span className="inline-block w-2 h-4 bg-foreground/60 animate-pulse ml-0.5 align-text-bottom" />
+                      </div>
+                    </div>
+                  )}
+                  {busy && !streamText && !streamTool && (
                     <div className="text-sm text-muted-foreground animate-pulse">
                       El agente está pensando…
                     </div>
                   )}
-                  {!conversationId && !chat.isPending && (
+                  {!conversationId && !busy && (
                     <p className="text-sm text-muted-foreground text-center py-10">
                       Escribe un mensaje para empezar una nueva conversación.
                     </p>
@@ -153,7 +260,7 @@ export default function PlaygroundPage() {
                     }
                   }}
                 />
-                <Button size="icon" onClick={send} disabled={chat.isPending || !input.trim()}>
+                <Button size="icon" onClick={send} disabled={busy || !input.trim()}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
