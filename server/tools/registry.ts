@@ -11,6 +11,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import type { AgentToolDefinition, ToolExecutionContext, ToolResult } from "../domain";
 import { memoryRepository } from "../infrastructure/repositories";
+import { databaseTool, discordTool, emailTool, slackTool, stripeTool } from "./integrations";
 
 const HTTP_TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_CHARS = 8_000;
@@ -215,6 +216,11 @@ export const TOOL_REGISTRY: Record<string, AgentToolDefinition> = {
   [apiTool.id]: apiTool,
   [webhookTool.id]: webhookTool,
   [memoryTool.id]: memoryTool,
+  [slackTool.id]: slackTool,
+  [discordTool.id]: discordTool,
+  [emailTool.id]: emailTool,
+  [databaseTool.id]: databaseTool,
+  [stripeTool.id]: stripeTool,
 };
 
 export function listAvailableTools() {

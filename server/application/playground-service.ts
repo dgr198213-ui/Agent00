@@ -11,6 +11,7 @@
 
 import { nanoid } from "nanoid";
 import { invokeLLM, type Message, type Tool as LLMTool, type ToolCall } from "../_core/llm";
+import { streamLLM } from "../infrastructure/llm-stream";
 import type { Agent, Conversation, DbMessage } from "../domain";
 import {
   conversationRepository,
@@ -24,7 +25,7 @@ import { knowledgeService } from "./knowledge-service";
 const MAX_TOOL_ITERATIONS = 5;
 const MAX_HISTORY_MESSAGES = 30;
 
-async function buildSystemPrompt(agent: Agent, userId: number): Promise<string> {
+async function buildSystemPrompt(agent: Agent, userId: number, query?: string): Promise<string> {
   const sections: string[] = [];
 
   sections.push(
@@ -32,7 +33,7 @@ async function buildSystemPrompt(agent: Agent, userId: number): Promise<string> 
       `Eres ${agent.name}, un agente de IA. ${agent.description ?? ""}`.trim()
   );
 
-  const knowledgeContext = await knowledgeService.buildContext(agent.id);
+  const knowledgeContext = await knowledgeService.buildContext(agent.id, 12_000, query);
   if (knowledgeContext) {
     sections.push(
       `## Conocimiento del agente\nUsa esta información como fuente principal cuando sea relevante:\n\n${knowledgeContext}`
@@ -76,6 +77,17 @@ export interface ChatResult {
   messages: DbMessage[];
 }
 
+/**
+ * Eventos emitidos durante un chat en streaming.
+ * - onToken: fragmento de texto de la respuesta según se genera.
+ * - onTool: el agente ha decidido usar una herramienta (el cliente debería
+ *   descartar el texto parcial acumulado de este turno).
+ */
+export interface ChatEvents {
+  onToken?: (text: string) => void;
+  onTool?: (toolName: string) => void;
+}
+
 export const playgroundService = {
   listConversations(userId: number, agentId: string): Promise<Conversation[]> {
     return conversationRepository.listByAgent(agentId, userId);
@@ -101,7 +113,8 @@ export const playgroundService = {
     userId: number,
     agentId: string,
     userMessage: string,
-    conversationId?: string
+    conversationId?: string,
+    events?: ChatEvents
   ): Promise<ChatResult> {
     const agent = await agentService.getOwned(userId, agentId);
 
@@ -120,7 +133,7 @@ export const playgroundService = {
       content: userMessage,
     });
 
-    const systemPrompt = await buildSystemPrompt(agent, userId);
+    const systemPrompt = await buildSystemPrompt(agent, userId, userMessage);
     const history = await conversationRepository.listMessages(conversation.id);
     const recent = history.slice(-MAX_HISTORY_MESSAGES);
 
@@ -140,19 +153,33 @@ export const playgroundService = {
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations += 1;
 
-      const result = await invokeLLM({
-        messages: llmMessages,
-        ...(tools.length > 0 ? { tools, toolChoice: "auto" as const } : {}),
-      });
+      let content: string;
+      let toolCalls: ToolCall[];
 
-      const choice = result.choices[0];
-      const content =
-        typeof choice?.message.content === "string"
-          ? choice.message.content
-          : (choice?.message.content ?? [])
-              .map(part => ("text" in part ? part.text : ""))
-              .join("");
-      const toolCalls: ToolCall[] = choice?.message.tool_calls ?? [];
+      if (events?.onToken) {
+        // Modo streaming: los tokens se emiten según llegan. Si el turno
+        // termina en tool calls, el cliente descarta el parcial al recibir onTool.
+        const result = await streamLLM({
+          messages: llmMessages,
+          ...(tools.length > 0 ? { tools } : {}),
+          onToken: events.onToken,
+        });
+        content = result.content;
+        toolCalls = result.toolCalls;
+      } else {
+        const result = await invokeLLM({
+          messages: llmMessages,
+          ...(tools.length > 0 ? { tools, toolChoice: "auto" as const } : {}),
+        });
+        const choice = result.choices[0];
+        content =
+          typeof choice?.message.content === "string"
+            ? choice.message.content
+            : (choice?.message.content ?? [])
+                .map(part => ("text" in part ? part.text : ""))
+                .join("");
+        toolCalls = choice?.message.tool_calls ?? [];
+      }
 
       if (toolCalls.length === 0) {
         finalContent = content || "(sin respuesta)";
@@ -173,6 +200,7 @@ export const playgroundService = {
           /* argumentos inválidos: se ejecuta con objeto vacío */
         }
 
+        events?.onTool?.(call.function.name);
         const connected = await toolRepository.findByAgentAndKey(agentId, call.function.name);
         const config = (connected?.config as Record<string, unknown>) ?? {};
         const toolResult = await executeTool(call.function.name, input, { ...toolCtxBase, config });
