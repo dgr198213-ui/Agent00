@@ -67,7 +67,7 @@ export class FileSystemMCPConnector extends BaseMCPConnector {
       
       return { valid: true, resolvedPath };
     } catch (error) {
-      return { valid: false, error: `Error validando ruta: ${error.message}` };
+      return { valid: false, error: `Error validando ruta: ${(error instanceof Error ? error.message : String(error))}` };
     }
   }
   
@@ -135,7 +135,7 @@ export class FileSystemMCPConnector extends BaseMCPConnector {
         },
       };
     } catch (error) {
-      return { success: false, error: `Error leyendo archivo: ${error.message}` };
+      return { success: false, error: `Error leyendo archivo: ${(error instanceof Error ? error.message : String(error))}` };
     }
   }
   
@@ -190,7 +190,7 @@ export class FileSystemMCPConnector extends BaseMCPConnector {
         },
       };
     } catch (error) {
-      return { success: false, error: `Error escribiendo archivo: ${error.message}` };
+      return { success: false, error: `Error escribiendo archivo: ${(error instanceof Error ? error.message : String(error))}` };
     }
   }
   
@@ -237,7 +237,7 @@ export class FileSystemMCPConnector extends BaseMCPConnector {
         },
       };
     } catch (error) {
-      return { success: false, error: `Error listando directorio: ${error.message}` };
+      return { success: false, error: `Error listando directorio: ${(error instanceof Error ? error.message : String(error))}` };
     }
   }
   
@@ -273,7 +273,7 @@ export class FileSystemMCPConnector extends BaseMCPConnector {
         },
       };
     } catch (error) {
-      return { success: false, error: `Error eliminando archivo: ${error.message}` };
+      return { success: false, error: `Error eliminando archivo: ${(error instanceof Error ? error.message : String(error))}` };
     }
   }
   

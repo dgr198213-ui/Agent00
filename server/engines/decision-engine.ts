@@ -304,8 +304,15 @@ class Evaluator {
 
     if (node.type === 'BinaryOp') {
       const binOp = node as BinaryOp;
-      const left = this.getValueFromContext((binOp.left as Identifier).name, context);
-      const right = this.getValueFromContext((binOp.right as Identifier).name, context) || (binOp.right as Literal).value;
+      const resolveOperand = (operand: ASTNode): unknown => {
+        if (operand.type === 'Literal') return (operand as Literal).value;
+        if (operand.type === 'Identifier') {
+          return this.getValueFromContext((operand as Identifier).name, context);
+        }
+        return undefined;
+      };
+      const left = resolveOperand(binOp.left);
+      const right = resolveOperand(binOp.right);
 
       switch (binOp.operator) {
         case '==':
@@ -634,6 +641,10 @@ export class DecisionEngine {
         activeRules: rules.filter(r => r.active).length,
         candidateRules: candidates.length,
         matchedRules: results.length,
+        averageConfidence:
+          results.length > 0
+            ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length
+            : 0,
         evaluationTime: executionTime,
         indexEfficiency: ((1 - candidates.length / rules.length) * 100).toFixed(1) + '%',
         topMatches: results.slice(0, 5),

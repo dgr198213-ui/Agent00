@@ -192,3 +192,166 @@ export const systemStates = mysqlTable("systemStates", {
 
 export type SystemState = typeof systemStates.$inferSelect;
 export type InsertSystemState = typeof systemStates.$inferInsert;
+
+// ============================================================================
+// AGENT BUILDER PLATFORM
+// Modelo de dominio: User → Workspace → Agent → Knowledge / Tool / Memory → Deployment
+// ============================================================================
+
+/**
+ * Workspaces: agrupación de agentes por usuario (preparado para equipos).
+ */
+export const workspaces = mysqlTable("workspaces", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("workspaces_userId_idx").on(table.userId),
+}));
+
+export type Workspace = typeof workspaces.$inferSelect;
+export type InsertWorkspace = typeof workspaces.$inferInsert;
+
+/**
+ * Agents: la entidad central de la plataforma.
+ */
+export const agents = mysqlTable("agents", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  workspaceId: varchar("workspaceId", { length: 64 }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  model: varchar("model", { length: 128 }).default("default").notNull(),
+  temperature: decimal("temperature", { precision: 3, scale: 2 }).default("0.70").notNull(),
+  systemPrompt: text("systemPrompt"),
+  icon: varchar("icon", { length: 64 }).default("bot").notNull(),
+  visibility: mysqlEnum("visibility", ["private", "public"]).default("private").notNull(),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("agents_userId_idx").on(table.userId),
+  statusIdx: index("agents_status_idx").on(table.status),
+}));
+
+export type Agent = typeof agents.$inferSelect;
+export type InsertAgent = typeof agents.$inferInsert;
+
+/**
+ * Knowledge: fuentes de conocimiento asociadas a un agente.
+ * Independientemente del origen, todo termina indexado igual (campo content).
+ */
+export const agentKnowledge = mysqlTable("agentKnowledge", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sourceType: mysqlEnum("sourceType", [
+    "text", "markdown", "pdf", "csv", "json", "website", "github", "notion", "gdocs", "confluence",
+  ]).notNull(),
+  sourceUrl: text("sourceUrl"),
+  content: text("content"),
+  status: mysqlEnum("status", ["pending", "indexed", "error"]).default("pending").notNull(),
+  size: int("size").default(0).notNull(),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("agentKnowledge_agentId_idx").on(table.agentId),
+  userIdIdx: index("agentKnowledge_userId_idx").on(table.userId),
+}));
+
+export type AgentKnowledge = typeof agentKnowledge.$inferSelect;
+export type InsertAgentKnowledge = typeof agentKnowledge.$inferInsert;
+
+/**
+ * Tools: herramientas conectadas a un agente.
+ * toolKey referencia una implementación del registro de herramientas.
+ */
+export const agentTools = mysqlTable("agentTools", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  userId: int("userId").notNull(),
+  toolKey: varchar("toolKey", { length: 64 }).notNull(),
+  config: json("config"),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("agentTools_agentId_idx").on(table.agentId),
+  agentToolIdx: index("agentTools_agent_tool_idx").on(table.agentId, table.toolKey),
+}));
+
+export type AgentTool = typeof agentTools.$inferSelect;
+export type InsertAgentTool = typeof agentTools.$inferInsert;
+
+/**
+ * Conversation Memory (temporal): conversaciones del Playground.
+ */
+export const conversations = mysqlTable("conversations", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 255 }).default("Nueva conversación").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("conversations_agentId_idx").on(table.agentId),
+  userIdIdx: index("conversations_userId_idx").on(table.userId),
+}));
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+export const messages = mysqlTable("messages", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  conversationId: varchar("conversationId", { length: 64 }).notNull(),
+  role: mysqlEnum("role", ["system", "user", "assistant", "tool"]).notNull(),
+  content: text("content").notNull(),
+  toolCalls: json("toolCalls"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdIdx: index("messages_conversationId_idx").on(table.conversationId),
+}));
+
+export type DbMessage = typeof messages.$inferSelect;
+export type InsertDbMessage = typeof messages.$inferInsert;
+
+/**
+ * Agent Memory (persistente): hechos que el agente recuerda entre conversaciones.
+ * Nunca se mezcla con la memoria de conversación.
+ */
+export const agentMemories = mysqlTable("agentMemories", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  userId: int("userId").notNull(),
+  memoryKey: varchar("memoryKey", { length: 255 }).notNull(),
+  value: text("value").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("agentMemories_agentId_idx").on(table.agentId),
+  agentKeyIdx: index("agentMemories_agent_key_idx").on(table.agentId, table.memoryKey),
+}));
+
+export type AgentMemory = typeof agentMemories.$inferSelect;
+export type InsertAgentMemory = typeof agentMemories.$inferInsert;
+
+/**
+ * Deployments: publicación de un agente (privado, público, API, widget, webhook).
+ */
+export const deployments = mysqlTable("deployments", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["private", "public", "api", "widget", "webhook"]).notNull(),
+  apiKey: varchar("apiKey", { length: 128 }),
+  status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+  config: json("config"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("deployments_agentId_idx").on(table.agentId),
+  apiKeyIdx: index("deployments_apiKey_idx").on(table.apiKey),
+}));
+
+export type Deployment = typeof deployments.$inferSelect;
+export type InsertDeployment = typeof deployments.$inferInsert;

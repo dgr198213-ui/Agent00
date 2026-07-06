@@ -9,11 +9,11 @@ import { CredentialManager } from './credential-manager';
  * Clase base para conectores MCP
  */
 export abstract class BaseMCPConnector implements MCPConnector {
-  id: string;
-  name: string;
-  type: MCPConnector['type'];
-  description: string;
-  icon: string;
+  id!: string;
+  name!: string;
+  type!: MCPConnector['type'];
+  description!: string;
+  icon!: string;
   config: MCPConnectorConfig;
   enabled: boolean = false;
   connected: boolean = false;
@@ -90,7 +90,7 @@ export class NotebookLMConnector extends BaseMCPConnector {
       this.enabled = true;
     } catch (error) {
       this.connected = false;
-      throw new Error(`Error conectando a NotebookLM: ${error.message}`);
+      throw new Error(`Error conectando a NotebookLM: ${(error instanceof Error ? error.message : String(error))}`);
     }
   }
   
@@ -134,7 +134,7 @@ export class NotebookLMConnector extends BaseMCPConnector {
     } catch (error) {
       return {
         success: false,
-        error: error.message,
+        error: (error instanceof Error ? error.message : String(error)),
       };
     }
   }
@@ -219,7 +219,7 @@ export class GitHubConnector extends BaseMCPConnector {
       }
     } catch (error) {
       this.connected = false;
-      throw new Error(`Error conectando a GitHub: ${error.message}`);
+      throw new Error(`Error conectando a GitHub: ${(error instanceof Error ? error.message : String(error))}`);
     }
   }
   
@@ -370,7 +370,7 @@ export class CustomAPIConnector extends BaseMCPConnector {
       this.enabled = response.ok;
     } catch (error) {
       this.connected = false;
-      throw new Error(`Error conectando a API: ${error.message}`);
+      throw new Error(`Error conectando a API: ${(error instanceof Error ? error.message : String(error))}`);
     }
   }
   
@@ -410,7 +410,7 @@ export class CustomAPIConnector extends BaseMCPConnector {
     } catch (error) {
       return {
         success: false,
-        error: error.message,
+        error: (error instanceof Error ? error.message : String(error)),
       };
     }
   }
