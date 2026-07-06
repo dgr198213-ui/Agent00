@@ -12,6 +12,8 @@ export type {
   InsertAgent,
   AgentKnowledge,
   InsertAgentKnowledge,
+  KnowledgeChunk,
+  InsertKnowledgeChunk,
   AgentTool,
   InsertAgentTool,
   AgentMemory,
@@ -68,6 +70,8 @@ import type {
   InsertAgent,
   AgentKnowledge,
   InsertAgentKnowledge,
+  KnowledgeChunk,
+  InsertKnowledgeChunk,
   AgentTool,
   InsertAgentTool,
   AgentMemory,
@@ -92,6 +96,13 @@ export interface KnowledgeRepository {
   create(item: InsertAgentKnowledge): Promise<void>;
   update(id: string, patch: Partial<InsertAgentKnowledge>): Promise<void>;
   delete(id: string): Promise<void>;
+}
+
+export interface ChunkRepository {
+  listByAgent(agentId: string): Promise<KnowledgeChunk[]>;
+  createMany(chunks: InsertKnowledgeChunk[]): Promise<void>;
+  deleteByKnowledgeId(knowledgeId: string): Promise<void>;
+  deleteByAgentId(agentId: string): Promise<void>;
 }
 
 export interface ToolRepository {

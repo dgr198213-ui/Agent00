@@ -17,10 +17,10 @@ No existe ninguna otra complejidad obligatoria.
 | Entidad | Descripción |
 |---|---|
 | **Agent** | Núcleo del producto: `id, name, description, model, temperature, systemPrompt, icon, visibility, status` |
-| **Knowledge** | Fuentes de conocimiento (texto, Markdown, CSV, JSON, website, GitHub, Notion, Google Docs, Confluence). Independientemente del origen, todo termina indexado igual |
-| **Tool** | Herramientas con interfaz única `Tool { id, name, schema(), execute() }`: navegador web, API HTTP, webhook, memoria persistente |
+| **Knowledge** | Fuentes de conocimiento (texto, Markdown, CSV, JSON, website, GitHub, Notion, Google Docs, Confluence). Todo se trocea en chunks y se indexa igual: retrieval semántico con embeddings cuando el proveedor está disponible, con degradación automática a scoring léxico |
+| **Tool** | Herramientas con interfaz única `Tool { id, name, schema(), execute() }`: navegador web, API HTTP, webhook, memoria persistente, Slack, Discord, Email (Resend), Base de datos (MySQL solo lectura) y Stripe (solo lectura) |
 | **Memory** | Dos tipos claramente separados: *Conversation Memory* (temporal, `conversations`/`messages`) y *Agent Memory* (persistente, `agentMemories`). Nunca se mezclan |
-| **Playground** | Donde se prueba el agente: chat con su identidad, conocimiento y herramientas |
+| **Playground** | Donde se prueba el agente: chat en streaming (SSE) con su identidad, conocimiento relevante (retrieval por consulta) y herramientas |
 | **Deployment** | Publicación del agente: `private`, `public`, `api`, `widget` o `webhook` |
 
 ## Modelo de datos
@@ -43,16 +43,20 @@ Separación estricta por capas — nada de lógica en Express:
 ```
 server/
 ├── api/              # Capa API (tRPC): validación y delegación
-│   └── agent-platform.ts
+│   ├── agent-platform.ts
+│   └── playground-stream.ts  # SSE: POST /api/playground/stream
 ├── application/      # Casos de uso
 │   ├── agent-service.ts
 │   ├── knowledge-service.ts
 │   ├── playground-service.ts
-│   └── deployment-service.ts
+│   ├── deployment-service.ts
+│   └── retrieval.ts         # chunking + coseno + fallback léxico
 ├── domain/           # Entidades y contratos (sin dependencias de framework)
 │   └── index.ts
-├── infrastructure/   # Implementaciones Drizzle de los repositorios
-│   └── repositories.ts
+├── infrastructure/   # Implementaciones Drizzle + clientes externos
+│   ├── repositories.ts
+│   ├── embeddings.ts       # /v1/embeddings con degradación a léxico
+│   └── llm-stream.ts       # streaming SSE del LLM con tool-calling
 ├── tools/            # Registro de herramientas (interfaz única Tool)
 │   └── registry.ts
 ├── engines/          # [Legado] Motor de reglas del Copiloto Maestro
@@ -104,12 +108,12 @@ Respuesta:
 pnpm install
 pnpm dev          # servidor de desarrollo
 pnpm check        # verificación de tipos (0 errores)
-pnpm test         # suite de tests (15/15)
+pnpm test         # suite de tests (51/51): unitarios + integración de Application
 pnpm build        # build de producción
 pnpm db:push      # generar y aplicar migraciones (requiere DATABASE_URL)
 ```
 
-Variables de entorno necesarias: `DATABASE_URL`, `JWT_SECRET`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.
+Variables de entorno necesarias: `DATABASE_URL`, `JWT_SECRET`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`. Opcional: `EMBEDDINGS_MODEL` (por defecto `text-embedding-3-small`; si el proveedor no expone `/v1/embeddings`, el retrieval degrada a léxico sin intervención).
 
 ## Módulos legados
 
@@ -121,4 +125,8 @@ El motor de reglas/patrones del **Copiloto Maestro** (`server/engines`, `/copilo
 - **Hecho — Fase 2 (Arquitectura):** capas API / Application / Domain / Infrastructure introducidas.
 - **Hecho — Fase 3 (Modelo de dominio):** entidades `Agent`, `Knowledge`, `Tool`, `Memory` y `Deployment` con interfaz estándar de herramientas.
 - **Hecho — Fase 4 (UX):** navegación lineal Crear → Conocimiento → Herramientas → Playground → Publicar.
-- **Pendiente — Fase 5 (Optimización):** retrieval con embeddings para Knowledge, streaming de respuestas en el Playground, más herramientas (Slack, Discord, Email, Database, Stripe), tests de integración de la capa Application y reducción de dependencias de UI no usadas.
+- **Hecho — Fase 5 (Optimización):** retrieval con embeddings + fallback léxico (tabla `knowledgeChunks`), streaming SSE en el Playground con eventos de herramienta, 5 herramientas nuevas (Slack, Discord, Email vía Resend, MySQL solo lectura, Stripe solo lectura), 36 tests nuevos (unitarios de retrieval, integración de Application con repositorios en memoria, validaciones de seguridad de herramientas) y 8 dependencias sin uso eliminadas.
+
+### Ideas futuras
+
+Reranking con cross-encoder, ingesta con refresco programado de fuentes URL, herramientas de escritura en Stripe/DB tras un sistema de aprobaciones, y widget embebible real para deployments tipo `widget`.

@@ -9,8 +9,10 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { nanoid } from "nanoid";
 import type { AgentKnowledge } from "../domain";
-import { knowledgeRepository } from "../infrastructure/repositories";
+import { chunkRepository, knowledgeRepository } from "../infrastructure/repositories";
+import { embedQuery, embedTexts } from "../infrastructure/embeddings";
 import { agentService } from "./agent-service";
+import { chunkText, rankChunks, selectContext } from "./retrieval";
 
 const MAX_CONTENT_CHARS = 60_000;
 const FETCH_TIMEOUT_MS = 20_000;
@@ -87,6 +89,24 @@ export const knowledgeService = {
       const raw = isUrlSource ? await fetchUrlAsText(input.sourceUrl!) : input.content!;
       const content = normalizeContent(raw);
       if (!content) throw new Error("La fuente no contiene texto");
+
+      // Chunking + embeddings (best-effort: si el proveedor de embeddings
+      // no está disponible, los chunks se guardan sin vector y el retrieval
+      // degrada a scoring léxico).
+      const pieces = chunkText(content);
+      const vectors = await embedTexts(pieces);
+      await chunkRepository.deleteByKnowledgeId(id);
+      await chunkRepository.createMany(
+        pieces.map((piece, index) => ({
+          id: nanoid(),
+          knowledgeId: id,
+          agentId: input.agentId,
+          chunkIndex: index,
+          content: piece,
+          embedding: vectors ? vectors[index] : null,
+        }))
+      );
+
       await knowledgeRepository.update(id, {
         content,
         size: content.length,
@@ -106,14 +126,27 @@ export const knowledgeService = {
   async remove(userId: number, knowledgeId: string): Promise<void> {
     const item = await knowledgeRepository.findById(knowledgeId);
     if (!item || item.userId !== userId) throw new Error("Fuente no encontrada");
+    await chunkRepository.deleteByKnowledgeId(knowledgeId);
     await knowledgeRepository.delete(knowledgeId);
   },
 
   /**
    * Construye el contexto de conocimiento que se inyecta en el prompt del agente.
-   * MVP: concatenación truncada. Futuro: embeddings + retrieval semántico.
+   *
+   * Con `query` hace retrieval: puntúa los chunks frente a la consulta
+   * (coseno si hay embeddings, léxico si no) y devuelve solo los relevantes.
+   * Sin `query` (p. ej. invocación stateless por API) concatena truncado.
    */
-  async buildContext(agentId: string, maxChars = 12_000): Promise<string> {
+  async buildContext(agentId: string, maxChars = 12_000, query?: string): Promise<string> {
+    if (query?.trim()) {
+      const chunks = await chunkRepository.listByAgent(agentId);
+      if (chunks.length > 0) {
+        const queryEmbedding = await embedQuery(query);
+        return selectContext(rankChunks(chunks, query, queryEmbedding), maxChars);
+      }
+      // Fuentes antiguas sin chunks → caer al modo concatenación.
+    }
+
     const items = await knowledgeRepository.listByAgent(agentId);
     const indexed = items.filter(item => item.status === "indexed" && item.content);
     if (indexed.length === 0) return "";

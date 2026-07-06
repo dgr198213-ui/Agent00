@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { deploymentService } from "../application/deployment-service";
+import { registerPlaygroundStreamRoute } from "../api/playground-stream";
 
 /**
  * Endpoint REST público para invocar agentes publicados.
@@ -65,6 +66,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // API pública de agentes desplegados (deployments tipo api/widget/webhook)
   registerAgentInvokeRoute(app);
+  // Chat en streaming (SSE) del Playground
+  registerPlaygroundStreamRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",

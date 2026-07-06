@@ -355,3 +355,24 @@ export const deployments = mysqlTable("deployments", {
 
 export type Deployment = typeof deployments.$inferSelect;
 export type InsertDeployment = typeof deployments.$inferInsert;
+
+/**
+ * Chunks de conocimiento: fragmentos indexables de cada fuente de Knowledge.
+ * `embedding` guarda el vector (JSON number[]) cuando el proveedor de
+ * embeddings está disponible; si es null, el retrieval usa scoring léxico.
+ */
+export const knowledgeChunks = mysqlTable("knowledgeChunks", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  knowledgeId: varchar("knowledgeId", { length: 64 }).notNull(),
+  agentId: varchar("agentId", { length: 64 }).notNull(),
+  chunkIndex: int("chunkIndex").notNull(),
+  content: text("content").notNull(),
+  embedding: json("embedding"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("knowledgeChunks_agentId_idx").on(table.agentId),
+  knowledgeIdIdx: index("knowledgeChunks_knowledgeId_idx").on(table.knowledgeId),
+}));
+
+export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect;
+export type InsertKnowledgeChunk = typeof knowledgeChunks.$inferInsert;
