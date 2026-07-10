@@ -102,6 +102,12 @@ Respuesta:
 - **Base de datos:** MySQL vía Drizzle ORM
 - **LLM:** integración vía `server/_core/llm.ts` con soporte de tool-calling
 
+## CI y calidad
+
+Cada push y pull request a `main` ejecuta el workflow de GitHub Actions (`.github/workflows/ci.yml`): verificación de tipos, suite de tests y build de producción. El estado actual del proyecto es 0 errores de TypeScript y 51/51 tests en verde.
+
+Notas de seguridad de dependencias: las dos advertencias altas restantes de `pnpm audit` (`lodash` vía recharts y `path-to-regexp` vía Express 4) no tienen versión parcheada compatible y sus vectores de ataque (`_.template` y rutas con expresiones regulares complejas) no se usan en este código.
+
 ## Desarrollo
 
 ```bash
